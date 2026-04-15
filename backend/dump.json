@@ -1,0 +1,52 @@
+{
+  "queries": [
+    {
+      "id": "3ea3988b-ab01-43c9-8e82-cc2694bcf36e",
+      "name": "Total Revenue"
+    },
+    {
+      "id": "ce086363-72de-4796-9bf3-3b1c8ff8eb81",
+      "name": "Country Wise Profit"
+    },
+    {
+      "id": "311c4efa-55db-4f17-933d-1a665409ebc1",
+      "name": "Maximum Profit"
+    },
+    {
+      "id": "03693546-0f87-478f-bd99-bbc24ebe9040",
+      "name": "PNLData"
+    }
+  ],
+  "datasets": [
+    {
+      "id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+      "name": "AllDataMerged",
+      "is_virtual": 0
+    },
+    {
+      "id": "3ea3988b-ab01-43c9-8e82-cc2694bcf36e",
+      "name": "Total Revenue",
+      "is_virtual": 1
+    },
+    {
+      "id": "ce086363-72de-4796-9bf3-3b1c8ff8eb81",
+      "name": "Country Wise Profit",
+      "is_virtual": 1
+    },
+    {
+      "id": "311c4efa-55db-4f17-933d-1a665409ebc1",
+      "name": "Maximum Profit",
+      "is_virtual": 1
+    },
+    {
+      "id": "03693546-0f87-478f-bd99-bbc24ebe9040",
+      "name": "PNLData",
+      "is_virtual": 1
+    },
+    {
+      "id": "318bdfa6-7ec8-47af-87d7-bc6c8724eda9",
+      "name": "PNLData",
+      "is_virtual": 1
+    }
+  ]
+}

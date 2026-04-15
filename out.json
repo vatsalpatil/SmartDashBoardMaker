@@ -1,0 +1,93 @@
+[
+  {
+    "id": "c2fcc3d7-3f29-4bfe-8411-33ec3b281ea7",
+    "name": "DateWiseProfit Chart",
+    "config": "{\"x_field\": \"order_date\", \"y_field\": \"profit\", \"y_fields\": null, \"aggregation\": \"sum\", \"group_by\": \"product_name\", \"filters\": [], \"colors\": null, \"title\": \"DateWiseProfit\", \"custom_sql\": \"SELECT order_date, sum(profit) as profit FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d GROUP BY order_date ORDER BY order_date LIMIT 200\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "line"
+  },
+  {
+    "id": "204b5d75-f115-4019-997b-f6a4232bfaad",
+    "name": "Revenue Chart Test",
+    "config": "{\"x_field\": \"order_date\", \"y_field\": \"revenue\", \"y_fields\": null, \"aggregation\": \"none\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"Revenue Over Time\", \"custom_sql\": \"SELECT order_date, revenue FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d ORDER BY order_date LIMIT 200\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "302ea7d0-9d7b-4b10-be3e-3c7a6fdd42ee",
+    "name": "Average Price",
+    "config": "{\"x_field\": null, \"y_field\": \"unit_price\", \"y_fields\": null, \"aggregation\": \"sum\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"Average Price\", \"custom_sql\": \"SELECT sum(unit_price) as unit_price FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d LIMIT 200\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "kpi"
+  },
+  {
+    "id": "d3480ae9-907b-4bae-991a-cc0bd2dc6fb7",
+    "name": "Country Wise Profit",
+    "config": "{\"x_field\": \"country\", \"y_field\": \"sum(profit)\", \"y_fields\": null, \"aggregation\": \"none\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"Country Wise Profit\", \"custom_sql\": \"SELECT \\\"country\\\", \\\"sum(profit)\\\" FROM (SELECT sum(profit),country FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d group by country) AS q ORDER BY \\\"country\\\" LIMIT 200\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "67544a5e-f0c5-46bb-9d70-43bc0e4aa9c4",
+    "name": "Product Wise Profit",
+    "config": "{\"x_field\": \"product_name\", \"y_field\": \"profit\", \"y_fields\": null, \"aggregation\": \"sum\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"Product Wise Profit\", \"custom_sql\": \"SELECT \\\"product_name\\\", sum(\\\"profit\\\") as \\\"profit\\\" FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d GROUP BY \\\"product_name\\\" ORDER BY \\\"product_name\\\" LIMIT 200\", \"chart_type\": \"bar\", \"source_type\": \"dataset\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "a947ca5b-caf1-45e3-b94c-984a91922f81",
+    "name": "City Wise Profit & Revenue Chart",
+    "config": "{\"x_field\": \"city\", \"y_field\": \"profit\", \"y_fields\": [\"profit\", \"revenue\"], \"aggregation\": \"sum\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"City Wise Profit & Revenue \", \"custom_sql\": \"SELECT \\\"city\\\", sum(\\\"profit\\\") as \\\"profit\\\", sum(\\\"revenue\\\") as \\\"revenue\\\" FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d GROUP BY \\\"city\\\" ORDER BY \\\"city\\\" LIMIT 200\", \"chart_type\": \"bar\", \"series_types\": {\"revenue\": \"line\"}, \"source_type\": \"dataset\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "a84e634b-faeb-4cf8-b32e-aabcefe2cd28",
+    "name": "Maximum Profit",
+    "config": "{\"x_field\": \"max(profit)\", \"y_field\": \"max(profit)\", \"y_fields\": [\"max(profit)\"], \"aggregation\": \"none\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"Maximum Profit\", \"custom_sql\": \"SELECT \\\"max(profit)\\\", \\\"max(profit)\\\" FROM (SELECT max(profit) FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d ) AS q ORDER BY \\\"max(profit)\\\" LIMIT 200\", \"chart_type\": \"kpi\", \"source_type\": \"query\", \"source_query_id\": \"311c4efa-55db-4f17-933d-1a665409ebc1\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "kpi"
+  },
+  {
+    "id": "e721fa87-1906-4ed5-b683-535f49de0182",
+    "name": "City Wise Revenue",
+    "config": "{\"x_field\": \"city\", \"y_field\": \"revenue\", \"y_fields\": [\"revenue\"], \"aggregation\": \"sum\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"City Wise Revenue\", \"custom_sql\": \"SELECT \\\"city\\\", sum(\\\"revenue\\\") as \\\"revenue\\\" FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d GROUP BY \\\"city\\\" ORDER BY \\\"city\\\" LIMIT 200\", \"chart_type\": \"bar\", \"series_types\": {\"revenue\": \"line\"}, \"source_type\": \"dataset\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "702622b9-e81a-4ddf-8997-1ada55aebd42",
+    "name": "City Wise Revenue",
+    "config": "{\"x_field\": \"city\", \"y_field\": \"revenue\", \"y_fields\": [\"revenue\"], \"aggregation\": \"sum\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"City Wise Revenue\", \"custom_sql\": \"SELECT \\\"city\\\", sum(\\\"revenue\\\") as \\\"revenue\\\" FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d GROUP BY \\\"city\\\" ORDER BY \\\"city\\\" LIMIT 200\", \"chart_type\": \"bar\", \"series_types\": {\"revenue\": \"line\"}, \"source_type\": \"dataset\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "fead6a32-375e-4c23-8bcf-abf54c72f2ad",
+    "name": "City Wise Revenue",
+    "config": "{\"x_field\": \"city\", \"y_field\": \"revenue\", \"y_fields\": [\"revenue\"], \"aggregation\": \"sum\", \"group_by\": null, \"filters\": [{\"column\": \"revenue\", \"operator\": \"gt\", \"value\": \"50\"}], \"colors\": null, \"title\": \"City Wise Revenue\", \"custom_sql\": \"SELECT \\\"city\\\", sum(\\\"revenue\\\") as \\\"revenue\\\" FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d WHERE \\\"revenue\\\" > 50 GROUP BY \\\"city\\\" ORDER BY \\\"city\\\" LIMIT 200\", \"chart_type\": \"bar\", \"series_types\": {\"revenue\": \"line\"}, \"source_type\": \"dataset\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "551d5326-9252-4bdd-b7ea-740bc73b6840",
+    "name": "Total Revenue",
+    "config": "{\"x_field\": \"\", \"y_field\": \"revenue\", \"y_fields\": [\"revenue\"], \"aggregation\": \"sum\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": null, \"custom_sql\": \"SELECT SUM(\\\"revenue\\\") AS \\\"revenue\\\" FROM dataset_59b3e729_0385_45ef_bb6f_e149375c657d LIMIT 200\", \"chart_type\": \"kpi\", \"limit\": 200, \"date_bin\": \"month\", \"source_type\": \"dataset\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "kpi"
+  },
+  {
+    "id": "9333914c-ca25-4318-9908-05af38acea3b",
+    "name": "PNLData",
+    "config": "{\"x_field\": \"city\", \"y_field\": \"TotalRevenue\", \"y_fields\": [\"TotalRevenue\", \"TotalProfit\", \"AverageCost\"], \"aggregation\": \"none\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"PNLData\", \"custom_sql\": \"SELECT \\\"city\\\", SUM(\\\"TotalRevenue\\\") AS \\\"TotalRevenue\\\", AVG(\\\"TotalProfit\\\") AS \\\"TotalProfit\\\", SUM(\\\"AverageCost\\\") AS \\\"AverageCost\\\" FROM (SELECT\\n  \\\"city\\\",\\n  \\\"country\\\",\\n  SUM(\\\"revenue\\\") AS \\\"TotalRevenue\\\",\\n  SUM(\\\"profit\\\") AS \\\"TotalProfit\\\",\\n  AVG(\\\"cost\\\") AS \\\"AverageCost\\\"\\nFROM \\\"dataset_59b3e729_0385_45ef_bb6f_e149375c657d\\\"\\nGROUP BY \\\"city\\\", \\\"country\\\"\\nLIMIT 200) AS q GROUP BY \\\"city\\\" ORDER BY \\\"city\\\" LIMIT 200\", \"chart_type\": \"bar\", \"limit\": 200, \"x_fields\": [\"country\", \"city\"], \"field_aggregations\": {\"TotalRevenue\": \"sum\", \"TotalProfit\": \"avg\", \"AverageCost\": \"sum\"}, \"source_type\": \"query\", \"source_query_id\": \"03693546-0f87-478f-bd99-bbc24ebe9040\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  },
+  {
+    "id": "e76d5b33-f73f-4404-9ff5-484385ee9b0e",
+    "name": "PNLData",
+    "config": "{\"x_field\": \"city\", \"y_field\": \"TotalRevenue\", \"y_fields\": [\"TotalRevenue\", \"TotalProfit\"], \"aggregation\": \"none\", \"group_by\": null, \"filters\": [], \"colors\": null, \"title\": \"PNLData\", \"custom_sql\": \"SELECT \\\"city\\\", SUM(\\\"TotalRevenue\\\") AS \\\"TotalRevenue\\\", AVG(\\\"TotalProfit\\\") AS \\\"TotalProfit\\\" FROM (SELECT\\n  \\\"city\\\",\\n  \\\"country\\\",\\n  SUM(\\\"revenue\\\") AS \\\"TotalRevenue\\\",\\n  SUM(\\\"profit\\\") AS \\\"TotalProfit\\\",\\n  AVG(\\\"cost\\\") AS \\\"AverageCost\\\"\\nFROM \\\"dataset_59b3e729_0385_45ef_bb6f_e149375c657d\\\"\\nGROUP BY \\\"city\\\", \\\"country\\\"\\nLIMIT 200) AS q GROUP BY \\\"city\\\" ORDER BY \\\"city\\\" LIMIT 200\", \"chart_type\": \"bar\", \"limit\": 200, \"x_fields\": [\"country\", \"city\"], \"field_aggregations\": {\"TotalRevenue\": \"sum\", \"TotalProfit\": \"avg\", \"AverageCost\": \"sum\"}, \"series_types\": {\"AverageCost\": \"line\"}, \"source_type\": \"query\", \"source_query_id\": \"03693546-0f87-478f-bd99-bbc24ebe9040\"}",
+    "dataset_id": "59b3e729-0385-45ef-bb6f-e149375c657d",
+    "chart_type": "bar"
+  }
+]
