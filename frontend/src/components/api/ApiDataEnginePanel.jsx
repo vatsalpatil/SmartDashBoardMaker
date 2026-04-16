@@ -492,7 +492,7 @@ export default function ApiDataEnginePanel() {
       </div>
 
       {/* ── Content Area ── */}
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
         {step === 1 && (
           <>
             <ApiPlayground

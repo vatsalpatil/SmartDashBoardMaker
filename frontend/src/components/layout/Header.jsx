@@ -67,7 +67,7 @@ export default function Header() {
               <Layers size={18} className="text-white" />
             </div>
             <span className="font-heading text-lg font-bold text-text-primary tracking-tight hidden lg:block">
-              Dashtor
+              DASHTOR
             </span>
           </div>
         </div>

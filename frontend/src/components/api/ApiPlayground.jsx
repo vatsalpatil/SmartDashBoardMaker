@@ -40,26 +40,25 @@ export default function ApiPlayground({
   const headerCount = cfg.headers.filter((h) => h.enabled && h.key).length;
 
   return (
-    <div className="flex flex-col gap-6 animate-slide-up">
-      <div style={card} className="p-8 pb-4">
-        {/* REQUEST NAME */}
-        <div className="flex items-center mb-6 pb-4">
-          <input
+    <div className="flex flex-col animate-slide-up">
+      <div style={card} className="rounded-xl overflow-hidden shadow-sm border border-border-default">
+        {/* TOP SECTION: NAME & URL */}
+        <div className="p-4 flex items-center justify-between border-b border-border-default bg-bg-surface/30">
+           <input
             value={cfg.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
             placeholder="Untitled Request"
-            className="bg-transparent border-none outline-none text-[22px] font-black text-text-primary px-0 focus:ring-0 placeholder:text-text-primary/30 w-full"
+            className="bg-transparent border-none outline-none text-[16px] font-black text-text-primary px-2 focus:ring-0 placeholder:text-text-primary/30 w-full"
           />
         </div>
 
         {/* UNIFIED URL BAR */}
-        <div className="flex items-stretch mb-80 bg-bg-surface border border-border-default rounded-xl overflow-hidden shadow-md focus-within:border-accent/40 focus-within:shadow-accent/5 transition-all">
+        <div className="flex items-stretch bg-bg-raised border-b border-border-default">
           <select
             value={cfg.method}
             onChange={(e) => onUpdate({ method: e.target.value })}
-            className="outline-none pl-5 pr-2 font-black text-[14px] cursor-pointer transition-colors"
+            className="outline-none pl-6 pr-4 font-black text-[14px] cursor-pointer transition-colors bg-transparent border-r border-border-default"
             style={{
-              background: "transparent",
               color: mc.color,
             }}
           >
@@ -74,8 +73,6 @@ export default function ApiPlayground({
             ))}
           </select>
 
-          <div className="w-[1px] bg-border-muted my-2" />
-
           <input
             value={cfg.url}
             onChange={(e) => onUpdate({ url: e.target.value })}
@@ -83,7 +80,7 @@ export default function ApiPlayground({
               e.key === "Enter" && !loading && cfg.url.trim() && onFetch()
             }
             placeholder="https://api.example.com/v1/endpoint"
-            className="flex-1 bg-transparent border-none outline-none px-4 py-3.5 font-mono text-[14px] text-text-primary placeholder:text-text-quaternary"
+            className="flex-1 bg-transparent border-none outline-none px-5 py-3 font-mono text-[14px] text-text-primary placeholder:text-text-quaternary"
             autoComplete="off"
             spellCheck="false"
           />
@@ -91,7 +88,7 @@ export default function ApiPlayground({
           <button
             onClick={onFetch}
             disabled={!cfg.url.trim() || loading}
-            className="flex items-center gap-2.5 px-8 bg-accent text-white font-black text-[14px] hover:bg-accent-hover transition-all disabled:opacity-30"
+            className="flex items-center gap-2.5 px-8 bg-accent text-white font-black text-[14px] hover:bg-accent-hover transition-all disabled:opacity-30 rounded-none shrink-0"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={16} />
@@ -103,7 +100,7 @@ export default function ApiPlayground({
         </div>
 
         {/* TAB NAVIGATION & ACTION BAR */}
-        <div className="flex justify-between items-end mb-6 flex-wrap gap-4 border-b border-border-default pb-0">
+        <div className="flex justify-between items-end flex-wrap gap-4 border-b border-border-default bg-bg-surface/20 px-6 pt-3">
           <TabBar
             tabs={[
               {
@@ -121,7 +118,7 @@ export default function ApiPlayground({
             onChange={setCfgTab}
           />
 
-          <div className="flex items-center gap-3 pb-2 pt-1">
+          <div className="flex items-center gap-3 pb-2">
             <button
               onClick={() => setUseProxy(!useProxy)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
@@ -158,7 +155,7 @@ export default function ApiPlayground({
         </div>
 
         {/* TAB CONTENTS */}
-        <div className="min-h-[160px] pb-4 animate-fade-in">
+        <div className="min-h-[200px] p-6 bg-bg-base animate-fade-in">
           {cfgTab === "params" && (
             <KVPairs
               label="Parameter"

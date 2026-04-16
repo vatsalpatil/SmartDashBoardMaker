@@ -46,8 +46,8 @@ export default function DataPreview({ datasetId, pageSize = 50 }) {
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="overflow-auto max-h-[480px]">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-1 overflow-auto min-h-0">
         <table className="w-full border-collapse text-[12px]">
           <thead>
             {table.getHeaderGroups().map(hg => (

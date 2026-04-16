@@ -90,7 +90,7 @@ export default function ResponseViewer({
       {/* CONTENT */}
       {isOpen && (
         <div className="flex flex-col h-[600px] bg-bg-base border-border-default">
-          <div className="p-4 bg-bg-surface/30 border-b border-border-default flex items-center justify-between gap-4 flex-wrap">
+          <div className="px-6 pt-3 bg-bg-surface/30 border-b border-border-default flex items-end justify-between gap-4 flex-wrap">
             <TabBar
               tabs={[
                 { id: "wizard", label: "Extract Wizard", icon: Zap },
@@ -101,7 +101,7 @@ export default function ResponseViewer({
               onChange={setViewTab}
             />
 
-            <div className="flex items-center gap-3 bg-bg-raised px-4 py-2 rounded-xl border border-border-muted flex-1 max-w-lg">
+            <div className="flex items-center gap-3 bg-bg-raised px-4 py-1.5 rounded-xl border border-border-muted flex-1 max-w-lg mb-2">
               <Search size={16} className="text-text-quaternary" />
               <div className="text-[12px] font-bold text-text-secondary shrink-0">Path:</div>
               <input

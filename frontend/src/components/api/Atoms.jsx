@@ -145,12 +145,11 @@ export function TabBar({ tabs, active, onChange }) {
     <div
       style={{
         display: "flex",
-        gap: 4,
-        padding: 4,
+        gap: 16,
+        padding: "0 4px",
         background: "transparent",
-        borderRadius: 8,
-        border: `1px solid #333`,
         overflowX: "auto",
+        marginBottom: "-1px",
       }}
     >
       {tabs.map((t) => (
@@ -161,20 +160,16 @@ export function TabBar({ tabs, active, onChange }) {
             display: "flex",
             alignItems: "center",
             gap: 6,
-            padding: "6px 14px",
-            borderRadius: 6,
-            fontSize: "0.8rem",
+            padding: "10px 4px",
+            fontSize: "0.82rem",
             fontWeight: 700,
             cursor: "pointer",
             transition: "all 0.2s",
             fontFamily: "var(--font-family-sans)",
-            background:
-              active === t.id ? "rgba(255,255,255,0.05)" : "transparent",
-            color: active === t.id ? "#fff" : "#777",
-            border:
-              active === t.id
-                ? "1px solid var(--color-accent)"
-                : "1px solid transparent",
+            background: "transparent",
+            color: active === t.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+            border: "none",
+            borderBottom: active === t.id ? "2px solid var(--color-accent)" : "2px solid transparent",
             whiteSpace: "nowrap",
           }}
         >
