@@ -1027,7 +1027,9 @@ body.qb-resizing {
 .qb-results-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--color-bg-base);
 }
 

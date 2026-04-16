@@ -1174,6 +1174,7 @@ export default function CustomQueryPage() {
             <div className="flex-1 max-w-[320px]">
               <SourceSelector
                 datasets={datasets}
+                savedQueries={savedQueries}
                 value={selDS}
                 onChange={(val) => {
                   setMode("ui");
@@ -1181,6 +1182,7 @@ export default function CustomQueryPage() {
                   setResult(null);
                   setErr(null);
                 }}
+                onQuerySelect={loadQuery}
               />
             </div>
             {dsInfo && (
@@ -1762,6 +1764,7 @@ export default function CustomQueryPage() {
                     result={result}
                     page={page}
                     onPageChange={changePage}
+                    executionTime={execTime}
                   />
                 )}
               </div>

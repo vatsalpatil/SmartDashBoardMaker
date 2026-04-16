@@ -4,8 +4,11 @@ import {
 } from '@tanstack/react-table';
 import { ChevronLeft, ChevronRight, Clock, Rows3 } from 'lucide-react';
 
-export default function QueryResults({ result, page, onPageChange }) {
+export default function QueryResults({ result, page, onPageChange, executionTime }) {
   if (!result || !result.rows) return null;
+
+  const rowCount = result.total !== undefined ? result.total : (result.rows?.length || 0);
+  const time = executionTime || 0;
 
   const colAligns = useMemo(() => {
     const aligns = {};
@@ -72,39 +75,21 @@ export default function QueryResults({ result, page, onPageChange }) {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const totalPages = Math.ceil((result.total_rows || 0) / (result.page_size || 50));
+  const totalPages = Math.ceil(rowCount / (result.page_size || 50));
 
   return (
-    <div className="qb-results-view">
-      {/* Stats bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '16px',
-        padding: '0 4px 10px', marginBottom: '8px', fontSize: '0.7rem',
-        borderBottom: '1px solid var(--border)',
-        fontWeight: 600,
-        color: 'var(--text-muted)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Rows3 size={13} style={{ color: 'var(--accent)' }} />
-          <span>{result.total_rows?.toLocaleString()} rows</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Clock size={13} style={{ color: 'var(--accent)' }} />
-          <span>{result.execution_time_ms?.toFixed(1) || result.execution_time?.toFixed(1)}ms</span>
-        </div>
-      </div>
-
+    <div className="qb-results-view" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         {/* Table Container - Flex layout to ensure pagination stays visible */}
         <div style={{ 
           display: 'flex', 
           flexDirection: 'column', 
-          height: 'calc(100vh - 200px)', 
-          minHeight: '300px'
+          flex: 1,
+          minHeight: 0
         }}>
           {/* Stats bar */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '16px',
-            padding: '0 4px 10px', marginBottom: '8px', fontSize: '0.7rem',
+            padding: '4px 12px 10px', marginBottom: '8px', fontSize: '0.7rem',
             borderBottom: '1px solid var(--border)',
             fontWeight: 600,
             color: 'var(--text-muted)',
@@ -112,17 +97,20 @@ export default function QueryResults({ result, page, onPageChange }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Rows3 size={13} style={{ color: 'var(--accent)' }} />
-              <span>{result.total_rows?.toLocaleString()} rows</span>
+              <span>{rowCount.toLocaleString()} rows</span>
             </div>
-            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Clock size={13} style={{ color: 'var(--accent)' }} />
+              <span>{time.toFixed(1)}ms</span>
+            </div>
           </div>
 
           {/* Scrollable Table Area */}
           <div style={{ 
             flex: 1, 
-            overflowY: 'auto', 
+            overflow: 'auto', 
             width: '100%',
-            minHeight: '200px'
+            minHeight: 0
           }}>
             <table className="data-table" style={{ width: '100%', minWidth: '600px', borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead>
@@ -198,7 +186,7 @@ export default function QueryResults({ result, page, onPageChange }) {
             flexShrink: 0
           }}>
             <span style={{ color: 'var(--text-muted)' }}>
-              Page {page} of {totalPages} ({result.total_rows?.toLocaleString()} results)
+              Page {page} of {totalPages} ({rowCount.toLocaleString()} results)
             </span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button

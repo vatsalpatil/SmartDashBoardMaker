@@ -3,8 +3,10 @@ import { ChevronDown, ChevronRight, Database, FileText, Check } from 'lucide-rea
 
 export default function SourceSelector({ 
   datasets = [], 
+  savedQueries = [],
   value, 
   onChange, 
+  onQuerySelect,
   placeholder = "Select source..." 
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,6 +25,12 @@ export default function SourceSelector({
 
   const originalDatasets = datasets.filter(d => !d.is_virtual);
   const virtualDatasets = datasets.filter(d => d.is_virtual);
+  
+  // Combine virtual datasets from DB and library queries
+  const allSaved = [
+    ...virtualDatasets.map(d => ({ ...d, type: 'virtual_ds' })),
+    ...savedQueries.map(q => ({ ...q, type: 'library_query', is_virtual: true }))
+  ];
 
   const selectedItem = datasets.find(d => String(d.id) === String(value)) || 
                        datasets.find(d => `dataset_${d.id}` === value);
@@ -119,26 +127,38 @@ export default function SourceSelector({
               {expandedGroup === 'virtual' ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
               <FileText size={12} />
               <span>Saved Queries</span>
-              <span className="ml-auto text-[10px] bg-bg-muted px-1.5 rounded text-text-quaternary">{virtualDatasets.length}</span>
+              <span className="ml-auto text-[10px] bg-bg-muted px-1.5 rounded text-text-quaternary">{allSaved.length}</span>
             </div>
             
             {expandedGroup === 'virtual' && (
               <div className="pl-2 mt-1 flex flex-col gap-0.5">
-                {virtualDatasets.length === 0 ? (
+                {allSaved.length === 0 ? (
                   <div className="px-3 py-2 text-[12px] text-text-quaternary italic">No saved queries</div>
                 ) : (
-                  virtualDatasets.map(d => {
-                    const isSelected = String(value).includes(String(d.id));
+                  allSaved.map(item => {
+                    const isSelected = String(value).includes(String(item.id));
+                    const isLibrary = item.type === 'library_query';
+                    
                     return (
                       <div 
-                        key={d.id}
-                        onClick={() => handleSelect(String(d.id))}
+                        key={item.id}
+                        onClick={() => {
+                          if (isLibrary && onQuerySelect) {
+                            onQuerySelect(item);
+                            setIsOpen(false);
+                          } else {
+                            handleSelect(String(item.id));
+                          }
+                        }}
                         className={[
                           'flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-[13px] transition-all duration-100',
                           isSelected ? 'text-violet bg-violet-muted font-medium' : 'text-text-primary hover:bg-bg-muted',
                         ].join(' ')}
                       >
-                        <span className="truncate">{d.name}</span>
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          {isLibrary && <FileText size={10} className="text-violet opacity-60" />}
+                          <span className="truncate">{item.name}</span>
+                        </div>
                         {isSelected && <Check size={13} className="shrink-0" />}
                       </div>
                     );

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel
 from models.database import get_db
@@ -112,3 +113,28 @@ async def validate_query_endpoint(req: ExecuteRequest):
         return {"valid": True}
     except Exception as e:
         return {"valid": False, "error": str(e)}
+
+@router.post("/export")
+async def export_query(req: ExecuteRequest, background_tasks: BackgroundTasks):
+    from services.data_service import export_query_to_csv
+    try:
+        tmp_path = export_query_to_csv(req.sql, req.dataset_id)
+        
+        def cleanup():
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
+                    
+        background_tasks.add_task(cleanup)
+        
+        return FileResponse(
+            path=tmp_path,
+            filename="query_results.csv",
+            media_type="text/csv"
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))

@@ -118,3 +118,27 @@ def execute_query_duckdb(sql: str, dataset_id: Optional[str] = None):
                         except: pass
         
         raise Exception(error_msg)
+
+def export_query_to_csv(sql: str, dataset_id: Optional[str] = None) -> str:
+    """Executes a query and exports the full result set to a temporary CSV file."""
+    con = get_duckdb()
+    if dataset_id:
+        resolve_table_reference(dataset_id)
+    
+    import tempfile
+    # Create a persistent temp file path
+    fd, tmp_path = tempfile.mkstemp(suffix='.csv')
+    os.close(fd)
+    
+    try:
+        # Clean the SQL
+        clean_sql = sql.strip().rstrip(';')
+        # DuckDB native export
+        # Use double single quotes for path escaping in DuckDB
+        esc_path = tmp_path.replace("'", "''")
+        con.execute(f"COPY ({clean_sql}) TO '{esc_path}' (HEADER, DELIMITER ',')")
+        return tmp_path
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise e
