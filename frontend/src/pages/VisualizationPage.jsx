@@ -30,7 +30,7 @@ export default function VisualizationPage() {
   }, []);
 
   const sourceParam = searchParams.get('source');
-  const vizIdParam = searchParams.get('id');
+  const vizIdParam = searchParams.get('id') || searchParams.get('edit');
 
   const [editVizId, setEditVizId] = useState(null);
   const [vizName, setVizName] = useState('');
@@ -110,7 +110,27 @@ export default function VisualizationPage() {
         : `dataset_${data.dataset_id}`;
       
       setSelectedSource(st);
-      setConfig(data.config || {});
+      
+      const defaultConfig = {
+        title: '',
+        chart_type: 'bar',
+        view_mode: 'chart',
+        x_fields: [],
+        x_field: '',
+        y_fields: [],
+        y_field: '',
+        field_aggregations: {},
+        limit: 500,
+        show_legend: true,
+        show_labels: false,
+        x_axis_filters: [],
+      };
+
+      const loadedConfig = { ...defaultConfig, ...(data.config || {}) };
+      if (loadedConfig.chart_type === 'pivot_table') {
+        loadedConfig.view_mode = 'table';
+      }
+      setConfig(loadedConfig);
       
       await initializeSource(st);
     } catch (err) {

@@ -86,7 +86,6 @@ export const CHART_CATALOG = [
     icon: 'Table2',
     presets: [
       { id: 'kpi',           label: 'KPI Card',        overrides: { chart_type: 'kpi' } },
-      { id: 'table',         label: 'Data Table',      overrides: { chart_type: 'table' } },
     ]
   },
 ];

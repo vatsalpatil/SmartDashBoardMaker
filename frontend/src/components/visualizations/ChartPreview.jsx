@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { 
   Activity, AlertCircle, TrendingUp, BarChart3, Layers, Maximize2, Minimize2, 
-  ChevronDown, Table2, Edit3, X, Loader2, Database, RefreshCw 
+  ChevronDown, Table2, Edit3, X, Loader2, Database, RefreshCw, ArrowDownUp 
 } from "lucide-react";
 import { COLOR_PALETTES } from "../../lib/chartPresets";
 import {
@@ -99,15 +99,20 @@ export default function ChartPreview({
   const isAutomaticKPI = data.length === 1 && Object.keys(data[0] || {}).length === 1;
   const autoKpiField = isAutomaticKPI ? Object.keys(data[0])[0] : null;
 
-  const chartType = isAutomaticKPI ? 'kpi' : (config.view_mode === 'table' ? 'table' : (config?.chart_type || "bar"));
-  const xField = isAutomaticKPI ? null : (config?.x_field || (config?.x_fields?.[0]));
+  const chartType = isAutomaticKPI ? 'kpi' : (
+    config.view_mode === 'table' ? (config?.chart_type === 'pivot_table' ? 'pivot_table' : 'table') : (config?.chart_type || "bar")
+  );
+  const xFieldsArray = isAutomaticKPI ? [] : (config?.x_fields?.length > 0 ? config.x_fields : [config?.x_field].filter(Boolean));
+  const xField = xFieldsArray[0];
   const yFields = isAutomaticKPI ? [autoKpiField] : (config?.y_fields?.length > 0 ? config.y_fields : (config?.y_field ? [config.y_field] : []));
   const palette = COLOR_PALETTES[config?.color_palette || 'default']?.colors || COLOR_PALETTES.default.colors;
 
   // 3. Transformation
   const resolvedData = data.slice(0, config.limit || 50).map((row, idx) => {
     const newRow = { ...row, __idx: idx };
-    if (xField) newRow[xField] = getFieldVal(row, xField);
+    xFieldsArray.forEach(f => {
+      newRow[f] = getFieldVal(row, f);
+    });
     yFields.forEach(f => {
       const val = getFieldVal(row, f);
       newRow[f] = (val !== null && val !== "" && !isNaN(Number(val))) ? Number(val) : val;
@@ -170,7 +175,7 @@ export default function ChartPreview({
             <thead style={{ position: 'sticky', top: 0, zIndex: 40, background: 'var(--color-bg-raised)' }}>
               <tr>
                 {cols.map(c => (
-                  <th key={c} style={{ background: 'var(--color-bg-overlay)' }} className="text-left px-5 py-3 text-[11px] font-bold text-text-tertiary uppercase tracking-widest border-b border-border-default whitespace-nowrap">
+                  <th key={c} style={{ background: 'var(--color-bg-overlay)' }} className="text-left px-5 py-3 text-[13px] font-bold text-text-tertiary uppercase tracking-widest border-b border-border-default whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       {c}
                       <div className="flex flex-col opacity-30">
@@ -189,7 +194,7 @@ export default function ChartPreview({
                     const val = row[c];
                     const isNum = typeof val === 'number' && !isNaN(val);
                     return (
-                      <td key={c} className={`px-5 py-3 text-[13px] border-b border-border-muted whitespace-nowrap ${isNum ? 'font-bold text-text-primary tabular-nums' : 'font-medium text-text-secondary'}`}>
+                      <td key={c} className={`px-5 py-4 text-[15px] border-b border-border-muted whitespace-nowrap ${isNum ? 'font-bold text-text-primary tabular-nums' : 'font-medium text-text-secondary'}`}>
                         {isNum ? val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (val ?? '-')}
                       </td>
                     );
@@ -206,12 +211,12 @@ export default function ChartPreview({
                     <td 
                       key={`total-${c}`} 
                       title={isNum ? val.toLocaleString() : undefined}
-                      className="px-5 py-3 text-[13px] font-black text-emerald border-t border-border-strong whitespace-nowrap"
+                      className="px-5 py-4 text-[15px] font-black text-emerald border-t border-border-strong whitespace-nowrap"
                     >
                       {idx === 0 ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button className="bg-transparent text-emerald font-black uppercase outline-none cursor-pointer border-b border-emerald/20 hover:border-emerald text-[11px] nodrag transition-all flex items-center gap-1">
+                            <button className="bg-transparent text-emerald font-black uppercase outline-none cursor-pointer border-b border-emerald/20 hover:border-emerald text-[13px] nodrag transition-all flex items-center gap-1">
                               {aggMode} <ChevronDown size={10} className="opacity-50" />
                             </button>
                           </DropdownMenuTrigger>
@@ -228,6 +233,191 @@ export default function ChartPreview({
                     </td>
                   );
                 })}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      );
+    }
+
+    if (chartType === 'pivot_table') {
+      const rowDim = config.x_fields?.[0] || config.x_field;
+      const colDim = config.x_fields?.[1];
+      const valDim = config.y_fields?.[0] || config.y_field;
+
+      if (!colDim || !valDim) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-white/10">
+            <Layers size={32} />
+            <span className="text-[10px] font-black uppercase tracking-widest text-center leading-relaxed">
+              Pivot Requires 2 Dimensions & 1 Metric<br/>
+              <span className="text-white/40 font-medium">Add dimensions and a metric to pivot.</span>
+            </span>
+          </div>
+        );
+      }
+
+      // Collect distinct columns and rows safely, handling nulls/empty
+      const colVals = [...new Set(resolvedData.map(r => r[colDim]))]
+        .filter(v => v !== undefined)
+        .sort((a, b) => String(a).localeCompare(String(b)));
+      
+      const rowVals = [...new Set(resolvedData.map(r => r[rowDim]))]
+        .filter(v => v !== undefined)
+        .sort((a, b) => String(a).localeCompare(String(b)));
+      
+      if (colVals.length === 0 || rowVals.length === 0) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-white/10">
+            <Loader2 size={32} className="animate-spin" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-center">
+              Compiling Matrix...<br/>
+              <span className="text-white/40 font-medium text-[9px] lowercase">No distinct {colVals.length === 0 ? colDim : rowDim} values found in preview sample.</span>
+            </span>
+          </div>
+        );
+      }
+
+      const pivotData = {};
+      resolvedData.forEach(r => {
+        const rowKey = r[rowDim];
+        const colKey = r[colDim];
+        const val = r[valDim];
+        if (rowKey === undefined || colKey === undefined) return;
+        
+        const rK = String(rowKey);
+        const cK = String(colKey);
+        
+        if (!pivotData[rK]) pivotData[rK] = {};
+        if (!pivotData[rK][cK]) pivotData[rK][cK] = [];
+        pivotData[rK][cK].push(Number(val) || 0);
+      });
+
+      // Aggregation
+      const aggregatedPivot = {};
+      rowVals.forEach(rv => {
+        const r = String(rv);
+        aggregatedPivot[r] = {};
+        colVals.forEach(cv => {
+          const c = String(cv);
+          const vals = pivotData[r]?.[c] || [];
+          if (vals.length === 0) return;
+          
+          let aggVal = 0;
+          switch (aggMode) {
+            case 'avg': aggVal = vals.reduce((a, b) => a + b, 0) / vals.length; break;
+            case 'min': aggVal = Math.min(...vals); break;
+            case 'max': aggVal = Math.max(...vals); break;
+            case 'count': aggVal = vals.length; break;
+            default: aggVal = vals.reduce((a, b) => a + b, 0); // sum
+          }
+          aggregatedPivot[r][c] = aggVal;
+        });
+      });
+
+      return (
+        <div className="w-full h-full overflow-auto custom-scrollbar rounded-2xl border border-border-default bg-bg-surface-raised relative">
+          <table className="w-full border-separate border-spacing-0" style={{ minWidth: 'max-content' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+              <tr>
+                <th style={{ background: 'var(--color-bg-overlay)', backdropFilter: 'blur(8px)' }} className="text-left px-5 py-4 text-[12px] font-black text-text-quaternary uppercase tracking-[0.2em] border-b border-r border-border-default whitespace-nowrap shadow-sm">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-accent underline decoration-accent/30 underline-offset-4">{rowDim}</span>
+                    <span className="text-text-quaternary opacity-40 ml-4">↳ {colDim}</span>
+                  </div>
+                </th>
+                {colVals.map(cv => {
+                  const c = String(cv);
+                  return (
+                    <th key={c} style={{ background: 'var(--color-bg-overlay)', backdropFilter: 'blur(8px)' }} className="text-right px-6 py-4 text-[13px] font-black text-text-tertiary tracking-widest border-b border-border-default whitespace-nowrap uppercase shadow-sm">
+                      {c === 'null' || c === '' ? <span className="italic opacity-30 text-[9px]">Unknown</span> : c}
+                    </th>
+                  );
+                })}
+                <th style={{ background: 'var(--color-bg-overlay)', backdropFilter: 'blur(8px)' }} className="text-right px-6 py-4 text-[13px] font-black text-emerald uppercase tracking-widest border-b border-l border-border-strong whitespace-nowrap shadow-md">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-muted/30">
+              {rowVals.map((rv, i) => {
+                const r = String(rv);
+                let rowTotal = 0;
+                let hasValues = false;
+                return (
+                  <tr key={i} className="hover:bg-bg-muted/40 transition-colors group/row">
+                    <td className="px-5 py-3 text-[14px] border-r border-border-muted whitespace-nowrap font-bold text-text-secondary bg-bg-surface/50">
+                      {r === 'null' || r === '' ? <span className="italic opacity-30 text-[9px]">Unknown</span> : r}
+                    </td>
+                    {colVals.map(cv => {
+                      const c = String(cv);
+                      const val = aggregatedPivot[r]?.[c];
+                      if (val !== undefined) {
+                        rowTotal += val;
+                        hasValues = true;
+                      }
+                      return (
+                        <td key={c} className="px-6 py-3 text-[15px] whitespace-nowrap text-right tabular-nums text-text-primary font-medium group-hover/row:text-accent transition-colors">
+                          {val !== undefined ? val.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
+                        </td>
+                      );
+                    })}
+                    <td className="px-6 py-3 text-[15px] border-l border-border-strong whitespace-nowrap text-right tabular-nums font-black text-emerald bg-emerald/[0.02] shadow-inner">
+                      {hasValues ? rowTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot style={{ position: 'sticky', bottom: 0, zIndex: 50 }}>
+              <tr>
+                <td style={{ background: 'var(--color-bg-overlay)', backdropFilter: 'blur(8px)' }} className="px-5 py-4 text-[15px] font-black border-t border-r border-border-strong whitespace-nowrap shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="bg-emerald-muted text-emerald font-black uppercase outline-none cursor-pointer px-2 py-1 rounded text-[9px] tracking-tighter hover:bg-emerald hover:text-white transition-all flex items-center gap-1.5">
+                        {aggMode} <ChevronDown size={10} className="stroke-[3]" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuLabel>Matrix Aggregation</DropdownMenuLabel>
+                      {['sum', 'avg', 'min', 'max', 'count'].map(m => (
+                        <DropdownMenuItem key={m} onClick={() => { setAggMode(m); onConfigChange?.({ ...config, agg_mode: m }); }} className="uppercase font-bold text-[11px]">
+                          {m}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
+                {colVals.map(cv => {
+                  const c = String(cv);
+                  let colTotal = 0;
+                  let hasValues = false;
+                  rowVals.forEach(rv => {
+                    const r = String(rv);
+                    const val = aggregatedPivot[r]?.[c];
+                    if (val !== undefined) {
+                      colTotal += val;
+                      hasValues = true;
+                    }
+                  });
+                  return (
+                    <td key={c} style={{ background: 'var(--color-bg-overlay)', backdropFilter: 'blur(8px)' }} className="px-6 py-4 text-[15px] font-black border-t border-border-strong whitespace-nowrap text-right text-emerald tabular-nums shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
+                      {hasValues ? colTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
+                    </td>
+                  );
+                })}
+                <td style={{ background: 'var(--color-bg-overlay)', backdropFilter: 'blur(8px)' }} className="px-6 py-4 text-[16px] font-black border-t border-l border-border-strong whitespace-nowrap text-right text-emerald tabular-nums bg-emerald/10 shadow-[0_-2px_10px_rgba(0,0,0,0.2)]">
+                  {rowVals.reduce((acc, rv) => {
+                     const r = String(rv);
+                     let rSum = 0;
+                     colVals.forEach(cv => {
+                       const c = String(cv);
+                       const val = aggregatedPivot[r]?.[c];
+                       if (val !== undefined) rSum += val;
+                     });
+                     return acc + rSum;
+                  }, 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -471,8 +661,64 @@ export default function ChartPreview({
             </button>
           )}
 
-          {/* X-axis switcher */}
-          {config.x_fields?.length > 1 && chartType !== 'table' && chartType !== 'kpi' && (
+          {/* Dimension Switcher (Pivot Specific) */}
+          {chartType === 'pivot_table' && config.x_fields?.length >= 2 && (
+            <div className="flex items-center gap-1.5 bg-bg-muted border border-border-default rounded-xl p-1 shadow-sm">
+              <div className="flex items-center gap-1 px-1.5">
+                <span className="text-[9px] font-black text-text-quaternary uppercase tracking-tighter">Rows</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="bg-bg-base border border-border-muted rounded-lg px-2 py-1 text-[10px] font-bold text-text-primary outline-none hover:border-accent transition-all flex items-center gap-1">
+                      {config.x_fields[0]} <ChevronDown size={10} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {config.x_fields.map(f => (
+                      <DropdownMenuItem key={f} onClick={() => {
+                        const next = [f, ...config.x_fields.filter(x => x !== f)];
+                        onConfigChange?.({ ...config, x_fields: next });
+                      }}>{f}</DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <button 
+                onClick={() => {
+                  const next = [...(config.x_fields || [])];
+                  [next[0], next[1]] = [next[1], next[0]];
+                  onConfigChange?.({ ...config, x_fields: next });
+                }}
+                className="w-6 h-6 flex items-center justify-center rounded-lg bg-accent text-white hover:rotate-180 transition-all duration-500 shadow-md"
+                title="Swap Rows & Columns"
+              >
+                <ArrowDownUp size={12} />
+              </button>
+
+              <div className="flex items-center gap-1 px-1.5">
+                <span className="text-[9px] font-black text-text-quaternary uppercase tracking-tighter">Cols</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="bg-bg-base border border-border-muted rounded-lg px-2 py-1 text-[10px] font-bold text-text-primary outline-none hover:border-accent transition-all flex items-center gap-1">
+                      {config.x_fields[1]} <ChevronDown size={10} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {config.x_fields.map(f => (
+                      <DropdownMenuItem key={f} onClick={() => {
+                        if (f === config.x_fields[0]) return;
+                        const next = [config.x_fields[0], f, ...config.x_fields.filter((x, i) => x !== f && i !== 0)];
+                        onConfigChange?.({ ...config, x_fields: next });
+                      }}>{f}</DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          )}
+
+          {/* X-axis switcher (Standard Charts) */}
+          {config.x_fields?.length > 1 && chartType !== 'table' && chartType !== 'kpi' && chartType !== 'pivot_table' && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="bg-bg-muted border border-border-default rounded-lg pl-3 pr-2 py-1 text-[11px] font-medium text-text-secondary outline-none cursor-pointer hover:border-accent transition-all flex items-center gap-2">
@@ -500,8 +746,8 @@ export default function ChartPreview({
             </DropdownMenu>
           )}
 
-          {/* Chart / Table toggle */}
-          {chartType !== 'kpi' && (
+          {/* Chart / Table toggle (Hidden for tabular views as per request) */}
+          {chartType !== 'kpi' && chartType !== 'table' && chartType !== 'pivot_table' && (
             <div className="flex items-center bg-bg-muted border border-border-default rounded-lg p-0.5 gap-0.5">
               <button
                 onClick={() => onConfigChange?.({ ...config, view_mode: 'chart' })}

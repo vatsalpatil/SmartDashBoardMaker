@@ -12,6 +12,8 @@ import {
   TerminalSquare,
   Database,
   Loader2,
+  Zap,
+  PenLine,
 } from "lucide-react";
 import {
   listVisualizations,
@@ -402,19 +404,29 @@ export default function WidgetsPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        navigate(`/visualize?source=query_${q.id}`);
+                      }}
+                      className="w-8 h-8 rounded-full bg-bg-muted hover:bg-bg-subtle text-text-tertiary hover:text-text-primary transition-all flex items-center justify-center border border-border-muted shadow-sm hover:border-accent/40"
+                      title="Build Visualization"
+                    >
+                      <Zap size={13} className="text-accent" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         navigate(`/query?edit=${q.id}`);
                       }}
-                      className="w-8 h-8 rounded-full bg-bg-muted hover:bg-bg-subtle text-text-tertiary hover:text-text-primary transition-all flex items-center justify-center border border-border-muted"
-                      title="Open Query"
+                      className="w-8 h-8 rounded-full bg-bg-muted hover:bg-bg-subtle text-text-tertiary hover:text-text-primary transition-all flex items-center justify-center border border-border-muted shadow-sm"
+                      title="Edit SQL"
                     >
-                      <ExternalLink size={13} className="text-violet" />
+                      <PenLine size={13} className="text-violet" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteQuery(q.id, q.name);
                       }}
-                      className="w-8 h-8 rounded-full bg-bg-muted hover:bg-rose/10 text-text-tertiary hover:text-rose transition-all flex items-center justify-center border border-border-muted"
+                      className="w-8 h-8 rounded-full bg-bg-muted hover:bg-rose/10 text-text-tertiary hover:text-rose transition-all flex items-center justify-center border border-border-muted shadow-sm"
                       title="Delete Query"
                     >
                       <Trash2 size={13} />

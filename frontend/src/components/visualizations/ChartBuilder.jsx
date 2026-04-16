@@ -40,8 +40,17 @@ export default function ChartBuilder({ columns, config, onConfigChange, onFieldC
     }
   }, [config.x_field, uniqueValues]);
 
+  useEffect(() => {
+    if (config.chart_type === 'pivot_table' || (config.chart_type === 'table' && config.view_mode === 'table')) {
+      setActiveTab('tabular');
+    } else if (config.chart_type && !config.view_mode?.includes('table')) {
+       setActiveTab('data');
+    }
+  }, [config.chart_type]);
+
   const tabs = [
     { id: 'data',     label: 'Mapping',      icon: Database },
+    { id: 'tabular',  label: 'Tabular',      icon: Table2 },
     { id: 'axis',     label: 'Axes',         icon: Ruler },
     { id: 'style',    label: 'Styling',      icon: Palette },
     { id: 'interact', label: 'Interactions', icon: Zap },
@@ -215,7 +224,10 @@ export default function ChartBuilder({ columns, config, onConfigChange, onFieldC
                                         key={p.id} 
                                         onClick={() => {
                                           const val = p.overrides.chart_type;
-                                          const patch = { field_chart_types: { ...(config.field_chart_types || {}), [f]: val } };
+                                          const patch = { 
+                                            field_chart_types: { ...(config.field_chart_types || {}), [f]: val },
+                                            view_mode: 'chart'
+                                          };
                                           if (i === 0) patch.chart_type = val;
                                           update(patch);
                                         }}
@@ -381,6 +393,141 @@ export default function ChartBuilder({ columns, config, onConfigChange, onFieldC
                   style={{ background: 'var(--color-bg-subtle)' }}
                 />
               </div>
+            </div>
+          )}
+
+          {activeTab === 'tabular' && (
+            <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
+               {/* View Mode Selection */}
+               <div className="space-y-3">
+                 <label className="qb-section-title flex items-center gap-1.5">
+                   <Layout size={11} className="text-accent" /> Interface Mode
+                 </label>
+                 <div className="grid grid-cols-2 gap-2 bg-bg-muted p-1 rounded-xl border border-border-default">
+                   <button 
+                     onClick={() => update({ view_mode: 'table', chart_type: 'table' })}
+                     className={[`flex flex-col items-center gap-2 py-4 rounded-lg transition-all border`, 
+                       (config.view_mode === 'table' && config.chart_type === 'table') 
+                        ? 'bg-accent text-white border-accent shadow-lg' 
+                        : 'text-text-tertiary border-transparent hover:bg-bg-subtle'
+                     ].join(' ')}
+                   >
+                     <Table2 size={24} strokeWidth={1.5} />
+                     <span className="text-[10px] font-black uppercase tracking-widest">Standard Table</span>
+                   </button>
+                   <button 
+                     onClick={() => update({ view_mode: 'table', chart_type: 'pivot_table' })}
+                     className={[`flex flex-col items-center gap-2 py-4 rounded-lg transition-all border`, 
+                       (config.view_mode === 'table' && config.chart_type === 'pivot_table') 
+                        ? 'bg-accent text-white border-accent shadow-lg' 
+                        : 'text-text-tertiary border-transparent hover:bg-bg-subtle'
+                     ].join(' ')}
+                   >
+                     <Layers size={24} strokeWidth={1.5} />
+                     <span className="text-[10px] font-black uppercase tracking-widest">Pivot Matrix</span>
+                   </button>
+                 </div>
+               </div>
+
+               {/* Pivot Specific Config */}
+               {(config.chart_type === 'pivot_table') && (
+                 <div className="space-y-5 animate-in fade-in zoom-in-95 duration-500">
+                   <div className="p-4 border border-border-default rounded-2xl bg-bg-surface-raised space-y-4">
+                     <div className="flex items-center justify-between">
+                       <span className="text-[10px] font-black text-text-primary uppercase tracking-[0.2em]">Matrix Construction</span>
+                       <button 
+                         onClick={() => {
+                           const next = [...(config.x_fields || [])];
+                           if (next.length >= 2) {
+                             [next[0], next[1]] = [next[1], next[0]];
+                             update({ x_fields: next });
+                           }
+                         }}
+                         className="flex items-center gap-2 px-2.5 py-1 rounded bg-accent-muted text-accent text-[9px] font-black uppercase transition-all hover:bg-accent hover:text-white"
+                       >
+                         <ArrowDownUp size={10} /> Swap
+                       </button>
+                     </div>
+
+                     <div className="space-y-4">
+                        {/* Rows Selection */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-bold text-text-quaternary uppercase ml-1">Rows (Vertical Axis)</label>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="w-full flex items-center justify-between bg-bg-base border border-border-muted rounded-xl px-4 py-2.5 text-[12px] font-bold text-text-primary outline-none hover:border-accent/40 transition-all">
+                                {config.x_fields?.[0] || <span className="text-text-quaternary italic font-medium">Select Dimension...</span>}
+                                <ChevronDown size={14} className="text-text-quaternary" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                              {(config.x_fields || []).map(f => (
+                                <DropdownMenuItem key={f} onClick={() => {
+                                  const next = [f, ...(config.x_fields || []).filter(x => x !== f)];
+                                  update({ x_fields: next });
+                                }}>{f}</DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+
+                        {/* Cols Selection */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-bold text-text-quaternary uppercase ml-1">Columns (Horizontal Axis)</label>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="w-full flex items-center justify-between bg-bg-base border border-border-muted rounded-xl px-4 py-2.5 text-[12px] font-bold text-text-primary outline-none hover:border-accent/40 transition-all">
+                                {config.x_fields?.[1] || <span className="text-text-quaternary italic font-medium">Select Dimension...</span>}
+                                <ChevronDown size={14} className="text-text-quaternary" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                              {(config.x_fields || []).map(f => (
+                                <DropdownMenuItem key={f} onClick={() => {
+                                  const base = (config.x_fields || []);
+                                  const next = [base[0], f, ...base.filter((x, i) => x !== f && i !== 0)];
+                                  update({ x_fields: next });
+                                }}>{f}</DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        {/* Metric Selection */}
+                        <div className="space-y-1.5 pt-2 border-t border-border-muted/50">
+                          <label className="text-[9px] font-bold text-text-quaternary uppercase ml-1">Metric (Aggregation)</label>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="w-full flex items-center justify-between bg-bg-base border border-border-muted rounded-xl px-4 py-2.5 text-[12px] font-bold text-rose outline-none hover:border-rose/40 transition-all uppercase">
+                                {config.y_fields?.[0] || config.y_field || <span className="text-text-quaternary italic font-normal">Select Metric...</span>}
+                                <ChevronDown size={14} className="text-text-quaternary" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                              {(config.y_fields || []).map(f => (
+                                <DropdownMenuItem key={f} onClick={() => {
+                                  const next = [f, ...(config.y_fields || []).filter(y => y !== f)];
+                                  update({ y_fields: next, y_field: f });
+                                }} className="uppercase font-bold">{f}</DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                     </div>
+                   </div>
+                 </div>
+               )}
+
+               {/* Standard Table Options */}
+               {config.chart_type === 'table' && (
+                 <div className="p-4 border border-border-default rounded-2xl bg-bg-surface-raised space-y-4">
+                   <span className="text-[10px] font-black text-text-primary uppercase tracking-[0.2em]">Table Formatting</span>
+                   <div className="flex flex-col gap-2">
+                     <p className="text-[11px] text-text-tertiary leading-relaxed">
+                       Column visibility and order are managed in the <span className="text-accent font-bold">Mapping</span> tab. Selected dimensions and metrics appear as columns.
+                     </p>
+                   </div>
+                 </div>
+               )}
             </div>
           )}
 

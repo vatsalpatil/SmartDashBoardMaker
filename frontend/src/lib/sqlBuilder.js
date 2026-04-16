@@ -16,7 +16,7 @@ export function buildSQL(config, datasetInfo, querySql = null) {
   }
 
   // 2. Resolve Visualization Parameters
-  const isTable = config.view_mode === 'table';
+  const isTable = config.view_mode === 'table' || config.chart_type === 'pivot_table';
   const xField = config.x_field || (config.x_fields?.length > 0 ? config.x_fields[0] : null);
   
   const dimsArr = isTable ? (config.visible_x_fields || config.x_fields || [xField]) : [xField];
