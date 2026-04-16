@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { Filter, X, Plus } from 'lucide-react';
+import { Filter, X, Plus, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "../ui/DropdownMenu";
 
 export default function FilterControls({ columns, filters, onFiltersChange, uniqueValues, onFocusColumn }) {
   const [showAdd, setShowAdd] = useState(false);
@@ -102,37 +110,60 @@ export default function FilterControls({ columns, filters, onFiltersChange, uniq
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <select
-                  className="select"
-                  style={{ width: '100%', padding: '8px 10px', fontSize: '0.82rem', background: 'var(--bg-input)' }}
-                  value={f.operator}
-                  onChange={(e) => {
-                    const op = e.target.value;
-                    const willBeMulti = op === 'in' || op === 'not_in';
-                    
-                    if (willBeMulti && onFocusColumn) {
-                       onFocusColumn(f.column);
-                    }
-                    
-                    if (willBeMulti && !Array.isArray(f.value)) {
-                       updateFilter(idx, { operator: op, value: f.value ? [f.value] : [] });
-                    } else if (!willBeMulti && Array.isArray(f.value)) {
-                       updateFilter(idx, { operator: op, value: f.value[0] || '' });
-                    } else {
-                       updateFilter(idx, { operator: op });
-                    }
-                  }}
-                >
-                  <option value="equals">=</option>
-                  <option value="not_equals">≠</option>
-                  <option value="in">IN (Multi-Select)</option>
-                  <option value="not_in">NOT IN</option>
-                  <option value="gt">&gt;</option>
-                  <option value="lt">&lt;</option>
-                  <option value="gte">≥</option>
-                  <option value="lte">≤</option>
-                  <option value="contains">LIKE</option>
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center justify-between w-full px-3 py-2 border border-border-default rounded-lg text-[13px] font-semibold text-text-primary hover:border-accent transition-all" style={{ background: 'var(--color-bg-raised)' }}>
+                      {(() => {
+                        switch(f.operator) {
+                          case 'equals': return '= Equals';
+                          case 'not_equals': return '≠ Not Equals';
+                          case 'in': return '∈ IN (Multi)';
+                          case 'not_in': return '∉ NOT IN';
+                          case 'gt': return '> Greater Than';
+                          case 'lt': return '< Less Than';
+                          case 'gte': return '≥ Greater or Equal';
+                          case 'lte': return '≤ Less or Equal';
+                          case 'contains': return '≈ LIKE/Contains';
+                          default: return f.operator;
+                        }
+                      })()}
+                      <ChevronDown size={14} className="text-text-quaternary" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[200px]">
+                    <DropdownMenuLabel>Operator</DropdownMenuLabel>
+                    {[
+                      { id: 'equals', label: '= Equals' },
+                      { id: 'not_equals', label: '≠ Not Equals' },
+                      { id: 'in', label: '∈ IN (Multi-Select)' },
+                      { id: 'not_in', label: '∉ NOT IN' },
+                      { id: 'gt', label: '> Greater Than' },
+                      { id: 'lt', label: '< Less Than' },
+                      { id: 'gte', label: '≥ Greater or Equal' },
+                      { id: 'lte', label: '≤ Less or Equal' },
+                      { id: 'contains', label: '≈ LIKE' },
+                    ].map(op => (
+                      <DropdownMenuItem key={op.id} onClick={() => {
+                        const nextOp = op.id;
+                        const willBeMulti = nextOp === 'in' || nextOp === 'not_in';
+                        
+                        if (willBeMulti && onFocusColumn) {
+                          onFocusColumn(f.column);
+                        }
+                        
+                        if (willBeMulti && !Array.isArray(f.value)) {
+                          updateFilter(idx, { operator: nextOp, value: f.value ? [f.value] : [] });
+                        } else if (!willBeMulti && Array.isArray(f.value)) {
+                          updateFilter(idx, { operator: nextOp, value: f.value[0] || '' });
+                        } else {
+                          updateFilter(idx, { operator: nextOp });
+                        }
+                      }}>
+                        {op.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {isMulti ? (
                   <div style={{

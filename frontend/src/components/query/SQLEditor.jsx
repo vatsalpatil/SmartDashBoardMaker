@@ -8,6 +8,7 @@ import { editorTheme, syntaxExtension } from "../../lib/editorTheme";
 
 /* ── SQL Functions & Keywords for autocomplete ── */
 const SQL_FUNCTIONS = [
+  
   "SUM",
   "AVG",
   "COUNT",
@@ -69,6 +70,7 @@ const SQL_FUNCTIONS = [
 
 const SQL_KEYWORDS = [
   "SELECT",
+  "AS",
   "FROM",
   "WHERE",
   "GROUP BY",

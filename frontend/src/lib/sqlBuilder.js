@@ -115,25 +115,72 @@ export function buildSQL(config, datasetInfo, querySql = null) {
   if (isAggregated) {
     const finalGroups = new Set();
     
-    // 1. Add Explicit Dimensions
+    // 1. ONLY include Explicit Dimensions in GROUP BY
     dimensions.forEach(f => finalGroups.add(`"${f.replace(/"/g, '""')}"`));
     
-    // 2. Add Non-Aggregated Metrics
-    metrics.forEach(f => {
-      const agg = (config.field_aggregations || {})[f] || config.aggregation || 'none';
-      if (agg === 'none' || !agg) {
-        finalGroups.add(`"${f.replace(/"/g, '""')}"`);
-      }
-    });
-
-    // 3. Safety: ensure any column we sort by is also in the GROUP BY if it's not a metric alias
+    // 2. Safety: ensure any column we sort by is also in the GROUP BY if it's not a metric alias
     sortRules.forEach(r => {
       const key = r.column.toLowerCase();
-      // If it's not a metric (or it's a non-aggregated metric/dim), it must be in GROUP BY
       if (!processedKeys.has(key)) {
         finalGroups.add(`"${r.column.replace(/"/g, '""')}"`);
       }
     });
+
+    // ── Metric Fallback ──
+    metrics.forEach(f => {
+      const key = f.toLowerCase();
+      const agg = (config.field_aggregations || {})[f] || config.aggregation || 'none';
+      const isAgg = agg && agg !== 'none';
+      const isDim = dimensions.some(d => d.toLowerCase() === key);
+
+      if (!isAgg && !isDim) {
+        const safeCol = f.includes('"') ? f : `"${f.replace(/"/g, '""')}"`;
+        const alias = `"${f.replace(/"/g, '""')}"`;
+        colMappings.set(key, `MAX(${safeCol}) AS ${alias}`);
+      }
+    });
+
+    const updatedSelect = [];
+    const finalProcessed = new Set();
+    [...new Set([...dimensions, ...metrics])].forEach(f => {
+      const key = f.toLowerCase();
+      if (finalProcessed.has(key)) return;
+      const sqlPart = colMappings.get(key);
+      if (sqlPart) {
+        updatedSelect.push(sqlPart);
+        finalProcessed.add(key);
+      }
+    });
+
+    sql = `SELECT ${updatedSelect.join(', ')} FROM ${baseSource}`;
+    
+    if (filterList.length > 0) {
+      const conditions = filterList.map(f => {
+        if (!f.column) return null;
+        const col = `"${f.column}"`;
+        const op = f.operator || f.op || '=';
+        const val = f.value;
+        const opMapper = {
+          '=': '=', '!=': '!=', '>': '>', '<': '<', '>=': '>=', '<=': '<=',
+          'contains': 'ILIKE', 'startsWith': 'ILIKE', 'endsWith': 'ILIKE', 'not_contains': 'NOT ILIKE'
+        };
+        const sqlOp = opMapper[op] || (op === 'IN' ? 'IN' : '=');
+        if (sqlOp === 'IN') {
+          const vals = Array.isArray(val) ? val.map(v => `'${String(v).replace(/'/g, "''")}'`).join(', ') : `'${String(val).replace(/'/g, "''")}'`;
+          return vals ? `${col} IN (${vals})` : null;
+        }
+        let finalVal = val;
+        if (sqlOp.includes('LIKE')) {
+          const prefix = (op === 'startsWith') ? '' : '%';
+          const suffix = (op === 'endsWith') ? '' : '%';
+          finalVal = `'${prefix}${String(val).replace(/'/g, "''")}${suffix}'`;
+        } else if (typeof finalVal === 'string') {
+          finalVal = `'${finalVal.replace(/'/g, "''")}'`;
+        }
+        return (finalVal !== undefined && finalVal !== null) ? `${col} ${sqlOp} ${finalVal}` : null;
+      }).filter(Boolean);
+      if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
+    }
 
     if (finalGroups.size > 0) {
       sql += ` GROUP BY ${Array.from(finalGroups).join(', ')}`;

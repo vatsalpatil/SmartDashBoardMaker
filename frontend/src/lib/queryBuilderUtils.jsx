@@ -11,15 +11,19 @@ let _uid = 0;
 export const uid = () => `u${++_uid}`;
 
 export function quoteIdentifier(col, ambiguousCols = new Set(), mainAlias = '') {
-  if (!col) return '';
-  if (col === '*') return '*';
-  if (col.includes('.')) {
-    return col.split('.').map(p => `"${p}"`).join('.');
+  if (col === undefined || col === null || col === '') return '';
+  if (typeof col === 'object') return '';
+  const s = String(col);
+  if (s.includes('[object Object]')) return '';
+  if (s === '*') return '*';
+
+  if (s.includes('.')) {
+    return s.split('.').map(p => `"${p}"`).join('.');
   }
-  if (ambiguousCols.has(String(col).toLowerCase()) && mainAlias) {
-    return `"${mainAlias}"."${col}"`;
+  if (ambiguousCols.has(s.toLowerCase()) && mainAlias) {
+    return `"${mainAlias}"."${s}"`;
   }
-  return `"${col}"`;
+  return `"${s}"`;
 }
 
 export const AGG_FUNCTIONS = ['COUNT', 'COUNT DISTINCT', 'SUM', 'AVG', 'MIN', 'MAX', 'MEDIAN', 'STDDEV'];

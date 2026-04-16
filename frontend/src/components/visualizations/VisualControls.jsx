@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Palette, Check } from 'lucide-react';
 import { COLOR_PALETTES } from '../../lib/chartPresets';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "../ui/DropdownMenu";
 
 export default function VisualControls({ config, onConfigChange }) {
   const [expanded, setExpanded] = useState(false);
@@ -243,16 +251,27 @@ export default function VisualControls({ config, onConfigChange }) {
           <div style={rowStyle}>
             {toggleBtn(showDataLabels, () => update({ show_data_labels: !showDataLabels }), showDataLabels ? '📊 ON' : '📊 OFF')}
             {showDataLabels && (
-              <select className="select" value={dataLabelFormat}
-                onChange={e => update({ data_label_format: e.target.value })}
-                style={{ fontSize: '0.68rem', padding: '3px 20px 3px 8px', height: '24px', width: 'auto' }}
-              >
-                <option value="value">Value</option>
-                <option value="percent">Percent</option>
-                <option value="name">Name</option>
-                <option value="name_value">Name + Value</option>
-                <option value="name_percent">Name + %</option>
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-border-muted text-[11px] font-bold text-text-primary hover:border-accent transition-all" style={{ background: 'var(--color-bg-overlay)' }}>
+                    {dataLabelFormat} <ChevronDown size={10} className="text-text-quaternary" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Label Format</DropdownMenuLabel>
+                  {[
+                    { id: 'value', label: 'Value' },
+                    { id: 'percent', label: 'Percent' },
+                    { id: 'name', label: 'Name' },
+                    { id: 'name_value', label: 'Name + Value' },
+                    { id: 'name_percent', label: 'Name + %' },
+                  ].map(f => (
+                    <DropdownMenuItem key={f.id} onClick={() => update({ data_label_format: f.id })}>
+                      {f.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 

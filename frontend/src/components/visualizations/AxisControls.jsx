@@ -19,8 +19,9 @@ export default function AxisControls({ config, onConfigChange }) {
   const sectionLabel = { fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', marginTop: '8px' };
   const rowStyle = { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' };
   const inputStyle = { fontSize: '0.72rem', padding: '3px 8px', height: '26px' };
-  const toggleBtn = (active, onClick, label) => (
+  const toggleBtn = (active, onClick, label, keyStr) => (
     <button
+      key={keyStr || label}
       onClick={onClick}
       style={{
         padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.63rem', fontWeight: 600,
@@ -94,7 +95,7 @@ export default function AxisControls({ config, onConfigChange }) {
           <div style={sectionLabel}>X-Axis Label Angle</div>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
             {[0, -30, -45, -60, -90].map(angle => (
-              toggleBtn(xRotation === angle, () => update({ axis_x_rotation: angle }), `${angle}°`)
+              toggleBtn(xRotation === angle, () => update({ axis_x_rotation: angle }), `${angle}°`, `angle-${angle}`)
             ))}
           </div>
 

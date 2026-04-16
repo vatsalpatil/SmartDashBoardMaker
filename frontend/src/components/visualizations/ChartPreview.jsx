@@ -1,12 +1,30 @@
 import { useState, useMemo } from 'react';
-import {
-  ComposedChart, Bar, Line, Area, PieChart, Pie, Cell, XAxis, YAxis, 
+import { 
+  ComposedChart, Bar, Line, Area, PieChart as RePieChart, Pie, Cell, XAxis, YAxis, 
   CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, 
   Scatter, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ZAxis
+  ZAxis, RadialBarChart, RadialBar
 } from "recharts";
-import { Activity, AlertCircle, TrendingUp, BarChart3, Layers, Maximize2, Minimize2, ChevronDown, Table2, Edit3, X } from "lucide-react";
+import { 
+  Activity, AlertCircle, TrendingUp, BarChart3, Layers, Maximize2, Minimize2, 
+  ChevronDown, Table2, Edit3, X, Loader2, Database, RefreshCw 
+} from "lucide-react";
 import { COLOR_PALETTES } from "../../lib/chartPresets";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "../ui/chart";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "../ui/DropdownMenu";
 
 const tooltipStyle = {
   contentStyle: {
@@ -43,7 +61,8 @@ export default function ChartPreview({
   isFullscreen,
   onEdit,
   onRemove,
-  isEditing 
+  isEditing,
+  isBuilder = false
 }) {
   const [aggMode, setAggMode] = useState(config.agg_mode || 'sum');
 
@@ -86,8 +105,8 @@ export default function ChartPreview({
   const palette = COLOR_PALETTES[config?.color_palette || 'default']?.colors || COLOR_PALETTES.default.colors;
 
   // 3. Transformation
-  const resolvedData = data.slice(0, config.limit || 50).map(row => {
-    const newRow = { ...row };
+  const resolvedData = data.slice(0, config.limit || 50).map((row, idx) => {
+    const newRow = { ...row, __idx: idx };
     if (xField) newRow[xField] = getFieldVal(row, xField);
     yFields.forEach(f => {
       const val = getFieldVal(row, f);
@@ -107,7 +126,15 @@ export default function ChartPreview({
     }
 
     if (chartType === 'table') {
-      const cols = Object.keys(resolvedData[0] || {});
+      // Order columns: Dimensions first, then Metrics. Exclude internal __idx.
+      const rawCols = Object.keys(resolvedData[0] || {});
+      const xFields = config.x_fields || [config.x_field].filter(Boolean);
+      const yFields = config.y_fields || [config.y_field].filter(Boolean);
+      
+      const cols = [
+        ...xFields.filter(f => rawCols.includes(f)),
+        ...yFields.filter(f => rawCols.includes(f) && !xFields.includes(f))
+      ];
       
       // Calculate totals for numeric columns based on mode
       const totals = cols.reduce((acc, col) => {
@@ -136,74 +163,74 @@ export default function ChartPreview({
         return acc;
       }, {});
 
+      // ── SINGLE-SCROLLER table: the table itself scrolls, no parent overflow wrapper ──
       return (
-        <div className="w-full h-full flex flex-col animate-in fade-in zoom-in-95 duration-500 overflow-hidden bg-[#13141b]/90 rounded-2xl border border-white/5">
-          <div className="flex-1 overflow-auto custom-scrollbar">
-            <table className="w-full border-separate border-spacing-0">
-              <thead className="sticky top-0 bg-[#13141b] z-40">
-                <tr>
-                  {cols.map(c => (
-                    <th key={c} className="text-left px-6 py-4 text-[13px] font-bold text-white/50 uppercase tracking-widest border-b border-white/5 whitespace-nowrap cursor-pointer hover:bg-white/5 transition-colors">
-                      <div className="flex items-center gap-2">
-                        {c}
-                        <div className="flex flex-col opacity-30">
-                          <ChevronDown size={10} className="rotate-180 -mb-1" />
-                          <ChevronDown size={10} />
-                        </div>
+        <div className="w-full h-full overflow-auto custom-scrollbar rounded-2xl border border-border-default" style={{ background: 'var(--color-bg-raised)' }}>
+          <table className="w-full border-separate border-spacing-0" style={{ minWidth: 'max-content' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 40, background: 'var(--color-bg-raised)' }}>
+              <tr>
+                {cols.map(c => (
+                  <th key={c} style={{ background: 'var(--color-bg-overlay)' }} className="text-left px-5 py-3 text-[11px] font-bold text-text-tertiary uppercase tracking-widest border-b border-border-default whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      {c}
+                      <div className="flex flex-col opacity-30">
+                        <ChevronDown size={10} className="rotate-180 -mb-1" />
+                        <ChevronDown size={10} />
                       </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {resolvedData.map((row, i) => (
-                  <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
-                    {cols.map((c, colIdx) => {
-                      const val = row[c];
-                      const isNum = typeof val === 'number' && !isNaN(val);
-                      return (
-                        <td key={c} className={`px-6 py-4 text-[14px] border-b border-white/[0.02] whitespace-nowrap ${isNum ? 'font-bold text-white' : 'font-medium text-white/80'}`}>
-                           {isNum ? val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (val || '-')}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                    </div>
+                  </th>
                 ))}
-              </tbody>
-              <tfoot className="sticky bottom-0 bg-[#13141b] z-40">
-                <tr className="bg-[#1a1b26]">
-                  {cols.map((c, idx) => {
-                    const val = totals[c];
-                    const isNum = typeof val === 'number' && val !== null;
+              </tr>
+            </thead>
+            <tbody>
+              {resolvedData.map((row, i) => (
+                <tr key={i} className="hover:bg-bg-muted/40 transition-colors">
+                  {cols.map(c => {
+                    const val = row[c];
+                    const isNum = typeof val === 'number' && !isNaN(val);
                     return (
-                      <td key={`total-${c}`} className="px-6 py-4 text-[14px] font-black text-emerald-400 border-t border-white/10 whitespace-nowrap bg-[#1a1b26]">
-                        {idx === 0 ? (
-                          <div className="flex items-center gap-2">
-                             
-                             <select 
-                               value={aggMode}
-                               onChange={(e) => {
-                                 const m = e.target.value;
-                                 setAggMode(m);
-                                 onConfigChange?.({ ...config, agg_mode: m });
-                               }}
-                               className="bg-transparent text-emerald-400 font-black uppercase outline-none cursor-pointer border-b border-emerald-400/20 hover:border-emerald-400 focus:border-emerald-400 transition-all text-[11px] nodrag"
-                             >
-                               <option className="bg-[#1e1e2d] text-white" value="sum">Sum</option>
-                               <option className="bg-[#1e1e2d] text-white" value="avg">Avg</option>
-                               <option className="bg-[#1e1e2d] text-white" value="min">Min</option>
-                               <option className="bg-[#1e1e2d] text-white" value="max">Max</option>
-                               <option className="bg-[#1e1e2d] text-white" value="count">Count</option>
-                             </select>
-                          </div>
-                        ) : (isNum ? formatValue(val) : '-')}
+                      <td key={c} className={`px-5 py-3 text-[13px] border-b border-border-muted whitespace-nowrap ${isNum ? 'font-bold text-text-primary tabular-nums' : 'font-medium text-text-secondary'}`}>
+                        {isNum ? val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (val ?? '-')}
                       </td>
                     );
                   })}
                 </tr>
-              </tfoot>
-            </table>
-          </div>
+              ))}
+            </tbody>
+            <tfoot style={{ position: 'sticky', bottom: 0, zIndex: 40, background: 'var(--color-bg-overlay)' }}>
+              <tr>
+                {cols.map((c, idx) => {
+                  const val = totals[c];
+                  const isNum = typeof val === 'number' && val !== null;
+                  return (
+                    <td 
+                      key={`total-${c}`} 
+                      title={isNum ? val.toLocaleString() : undefined}
+                      className="px-5 py-3 text-[13px] font-black text-emerald border-t border-border-strong whitespace-nowrap"
+                    >
+                      {idx === 0 ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="bg-transparent text-emerald font-black uppercase outline-none cursor-pointer border-b border-emerald/20 hover:border-emerald text-[11px] nodrag transition-all flex items-center gap-1">
+                              {aggMode} <ChevronDown size={10} className="opacity-50" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuLabel>Aggregation Mode</DropdownMenuLabel>
+                            {['sum', 'avg', 'min', 'max', 'count'].map(m => (
+                              <DropdownMenuItem key={m} onClick={() => { setAggMode(m); onConfigChange?.({ ...config, agg_mode: m }); }} className="uppercase">
+                                {m}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (isNum ? formatValue(val) : '-')}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          </table>
         </div>
       );
     }
@@ -230,10 +257,18 @@ export default function ChartPreview({
     }
 
     // Charts
+    const chartConfig = {};
+    yFields.forEach((f, i) => {
+      chartConfig[f] = {
+        label: f,
+        color: palette[i % palette.length],
+      };
+    });
+
     return (
-      <ResponsiveContainer width="100%" height="100%">
+      <ChartContainer config={chartConfig} className="h-full w-full">
         {chartType === 'pie' || chartType === 'donut' || chartType === 'rose' ? (
-          <PieChart>
+          <RePieChart>
             <Pie
               data={resolvedData}
               dataKey={yFields[0]}
@@ -248,121 +283,265 @@ export default function ChartPreview({
                 <Cell key={index} fill={palette[index % palette.length]} fillOpacity={0.8} />
               ))}
             </Pie>
-            <Tooltip {...tooltipStyle} formatter={val => formatValue(val)} />
-            {config.legend_position !== 'hidden' && <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase', letterSpacing: '0.1em' }} />}
-          </PieChart>
+            <ChartTooltip 
+              cursor={false} 
+              content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} 
+            />
+            {config.legend_position !== 'hidden' && (
+              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={36} />
+            )}
+          </RePieChart>
         ) : chartType === 'radar' ? (
           <RadarChart cx="50%" cy="50%" outerRadius="80%" data={resolvedData}>
-            <PolarGrid stroke="white" strokeOpacity={0.05} />
-            <PolarAngleAxis dataKey={xField} tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 'bold' }} />
+            <PolarGrid stroke="var(--color-border-muted)" strokeOpacity={0.2} />
+            <PolarAngleAxis dataKey={xField} tick={{ fill: 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 'bold' }} />
             <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
             {yFields.map((f, i) => (
               <Radar
                 key={f}
                 name={f}
                 dataKey={f}
-                stroke={palette[i % palette.length]}
-                fill={palette[i % palette.length]}
+                stroke={`var(--color-${f})`}
+                fill={`var(--color-${f})`}
                 fillOpacity={0.2}
               />
             ))}
-            <Tooltip {...tooltipStyle} />
+            <ChartTooltip 
+              cursor={{ stroke: 'var(--color-accent)', strokeWidth: 1, strokeDasharray: '4 4' }}
+              content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} 
+            />
           </RadarChart>
+        ) : chartType === 'radial_bar' ? (
+          <RadialBarChart 
+            cx="50%" 
+            cy="50%" 
+            innerRadius="10%" 
+            outerRadius="80%" 
+            barSize={10} 
+            data={resolvedData}
+          >
+            <RadialBar
+              minAngle={15}
+              label={{ position: 'insideStart', fill: '#fff' }}
+              background
+              clockWise
+              dataKey={yFields[0]}
+              isAnimationActive={false}
+            >
+              {resolvedData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
+              ))}
+            </RadialBar>
+            <ChartTooltip 
+              cursor={false}
+              content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} 
+            />
+            {config.legend_position !== 'hidden' && (
+              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={36} />
+            )}
+          </RadialBarChart>
         ) : (
           <ComposedChart 
             data={resolvedData} 
             layout={chartType === 'horizontal_bar' ? 'vertical' : 'horizontal'}
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="white" strokeOpacity={0.03} vertical={false} />
-            <XAxis dataKey={xField} tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="left" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 'bold' }} tickFormatter={formatValue} axisLine={false} tickLine={false} />
-            {yFields.length > 1 && <YAxis yAxisId="right" orientation="right" tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }} tickFormatter={formatValue} axisLine={false} tickLine={false} />}
-            <Tooltip {...tooltipStyle} formatter={val => formatValue(val)} />
-            <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'black', textTransform: 'uppercase', paddingBottom: '10px' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-muted)" strokeOpacity={0.2} vertical={false} />
+            <XAxis 
+              dataKey={chartType === 'horizontal_bar' ? undefined : '__idx'} 
+              type={chartType === 'horizontal_bar' ? 'number' : 'category'}
+              tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 'bold' }} 
+              axisLine={false} 
+              tickLine={false} 
+              tickFormatter={(idx) => {
+                const row = resolvedData.find(r => r.__idx === idx);
+                return row ? row[xField] : idx;
+              }}
+            />
+            <YAxis 
+              yAxisId="left" 
+              dataKey={chartType === 'horizontal_bar' ? '__idx' : undefined}
+              type={chartType === 'horizontal_bar' ? 'category' : 'number'}
+              tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 'bold' }} 
+              tickFormatter={(val) => {
+                if (chartType === 'horizontal_bar') {
+                  const row = resolvedData.find(r => r.__idx === val);
+                  return row ? row[xField] : val;
+                }
+                return formatValue(val);
+              }}
+              axisLine={false} 
+              tickLine={false} 
+            />
+            {yFields.length > 1 && (
+              <YAxis 
+                yAxisId="right" 
+                orientation="right" 
+                tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 'bold' }} 
+                tickFormatter={formatValue} 
+                axisLine={false} 
+                tickLine={false} 
+              />
+            )}
+            <ChartTooltip 
+              cursor={{ stroke: 'var(--color-accent)', strokeWidth: 1, strokeDasharray: '4 4' }}
+              content={<ChartTooltipContent 
+                labelFormatter={(idx) => {
+                  const row = resolvedData.find(r => r.__idx === idx);
+                  return row ? row[xField] : idx;
+                }} 
+                formatter={(v) => formatValue(v)}
+              />} 
+            />
+            {config.legend_position !== 'hidden' && (
+              <ChartLegend content={<ChartLegendContent />} verticalAlign="top" align="center" />
+            )}
             {yFields.map((f, i) => {
               const type = config.field_chart_types?.[f] || config.chart_type || 'bar';
               const axisId = (config.y_axis_assign?.[f] || (i === 0 ? 'left' : 'right'));
-              if (type.includes('bar')) return <Bar yAxisId={axisId} key={f} dataKey={f} fill={palette[i % palette.length]} radius={[4, 4, 0, 0]} barSize={24} fillOpacity={0.8} />;
-              if (type.includes('line')) return <Line yAxisId={axisId} key={f} dataKey={f} stroke={palette[i % palette.length]} strokeWidth={2} dot={{ r: 2 }} type="monotone" />;
-              if (type.includes('area')) return <Area yAxisId={axisId} key={f} dataKey={f} stroke={palette[i % palette.length]} fill={palette[i % palette.length]} fillOpacity={0.1} type="monotone" />;
+              
+              if (type.includes('bar')) return (
+                <Bar 
+                  yAxisId={axisId} 
+                  key={f} 
+                  dataKey={f} 
+                  fill={`var(--color-${f})`} 
+                  radius={[4, 4, 0, 0]} 
+                  barSize={24} 
+                  fillOpacity={0.8} 
+                  isAnimationActive={false}
+                />
+              );
+              
+              if (type.includes('line')) return (
+                <Line 
+                  yAxisId={axisId} 
+                  key={f} 
+                  dataKey={f} 
+                  stroke={`var(--color-${f})`} 
+                  strokeWidth={2} 
+                  dot={{ r: 2 }} 
+                  type="monotone" 
+                  isAnimationActive={false}
+                />
+              );
+              
+              if (type.includes('area')) return (
+                <Area 
+                  yAxisId={axisId} 
+                  key={f} 
+                  dataKey={f} 
+                  stroke={`var(--color-${f})`} 
+                  fill={`var(--color-${f})`} 
+                  fillOpacity={0.1} 
+                  type="monotone" 
+                  isAnimationActive={false}
+                />
+              );
+              
               return null;
             })}
           </ComposedChart>
         )}
-      </ResponsiveContainer>
+      </ChartContainer>
     );
   };
 
   return (
-    <div className="flex flex-col h-full w-full p-5 group/preview">
+    <div className="flex flex-col h-full w-full p-4 group/preview" style={{ background: 'var(--color-bg-raised)' }}>
       {/* ── HEADER ── */}
-      <div className="relative flex items-center justify-between mb-6 z-20 shrink-0">
-        <div className="flex-1 drag-handle cursor-move select-none w-full min-w-0" title="Drag to move widget">
-          <h3 className="text-[17px] font-bold text-white truncate w-full pr-2">
+      <div className="relative flex items-center justify-between mb-3 z-20 shrink-0">
+        <div className="flex-1 drag-handle cursor-move select-none min-w-0" title="Drag to move widget">
+          <h3 className="text-[15px] font-bold text-text-primary truncate pr-2">
             {config.title || 'Live Insight'}
           </h3>
         </div>
-        
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-3 opacity-0 group-hover/preview:opacity-100 transition-opacity duration-200 pointer-events-none group-hover/preview:pointer-events-auto bg-bg-raised pl-6 py-2 before:content-[''] before:absolute before:-left-12 before:top-0 before:bottom-0 before:w-12 before:bg-gradient-to-r before:from-transparent before:to-bg-raised z-30">
+
+        {/* Controls — always visible in editing, hover-reveal otherwise */}
+        <div className={[
+          'flex items-center gap-2 shrink-0 transition-all duration-200',
+          isEditing ? '' : 'opacity-0 group-hover/preview:opacity-100',
+        ].join(' ')}>
           {onToggleFullscreen && (
-            <button 
+            <button
               onClick={onToggleFullscreen}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all text-xl"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-text-quaternary hover:text-text-primary hover:bg-bg-muted transition-all"
             >
-              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             </button>
           )}
 
-          {/* Focal Dimension Switcher */}
-          {(config.x_fields?.length > 1 && chartType !== 'table' && chartType !== 'kpi') && (
-            <div className="relative">
-              <select 
-                className="bg-transparent border border-white/10 rounded-lg pl-4 pr-8 py-1.5 text-[14px] font-medium text-white outline-none cursor-pointer appearance-none hover:bg-white/5 transition-all"
-                value={xField}
-                onChange={(e) => onConfigChange?.({ ...config, x_field: e.target.value })}
-              >
+          {/* X-axis switcher */}
+          {config.x_fields?.length > 1 && chartType !== 'table' && chartType !== 'kpi' && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="bg-bg-muted border border-border-default rounded-lg pl-3 pr-2 py-1 text-[11px] font-medium text-text-secondary outline-none cursor-pointer hover:border-accent transition-all flex items-center gap-2">
+                  {xField} <ChevronDown size={11} className="text-text-quaternary" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Dimension Switch</DropdownMenuLabel>
                 {config.x_fields.map(f => (
-                  <option className="bg-[#1e1e2d] text-white" key={f} value={f}>{f}</option>
+                  <DropdownMenuItem 
+                    key={f} 
+                    onClick={() => {
+                      const nextX = f;
+                      const nextSortRules = [
+                        { col: nextX, dir: 'ASC' },
+                        ...(config.sort_rules || []).filter(r => r.col !== nextX && !config.x_fields?.includes(r.col))
+                      ];
+                      onConfigChange?.({ ...config, x_field: nextX, sort_rules: nextSortRules });
+                    }}
+                  >
+                    {f}
+                  </DropdownMenuItem>
                 ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
-            </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
-          {/* View Toggles */}
+          {/* Chart / Table toggle */}
           {chartType !== 'kpi' && (
-            <div className="flex items-center bg-transparent border border-white/10 rounded-xl p-1 gap-1">
-              <button 
+            <div className="flex items-center bg-bg-muted border border-border-default rounded-lg p-0.5 gap-0.5">
+              <button
                 onClick={() => onConfigChange?.({ ...config, view_mode: 'chart' })}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[14px] font-bold ${chartType !== 'table' ? 'bg-white/10 text-white border border-white/5' : 'text-white/40 hover:text-white/70 hover:bg-white/5 border border-transparent'}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
+                  chartType !== 'table'
+                    ? 'bg-accent text-white'
+                    : 'text-text-quaternary hover:text-text-primary'
+                }`}
               >
-                <BarChart3 size={15} /> Chart
+                <BarChart3 size={12} /> Chart
               </button>
-              <button 
+              <button
                 onClick={() => onConfigChange?.({ ...config, view_mode: 'table' })}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[14px] font-bold ${chartType === 'table' ? 'bg-white/10 text-white border border-white/5' : 'text-white/40 hover:text-white/70 hover:bg-white/5 border border-transparent'}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
+                  chartType === 'table'
+                    ? 'bg-accent text-white'
+                    : 'text-text-quaternary hover:text-text-primary'
+                }`}
               >
-                <Table2 size={15} /> Table
+                <Table2 size={12} /> Table
               </button>
             </div>
           )}
 
-          {/* Utility Box */}
+          {/* Edit / Remove */}
           {isEditing && (
-            <div className="flex items-center gap-1.5 ml-1">
-              <button onClick={onEdit} className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center text-white/50 hover:text-white hover:bg-emerald-500/20 transition-all">
-                <Edit3 size={15} />
+            <div className="flex items-center gap-1">
+              <button onClick={onEdit} className="w-7 h-7 rounded-lg border border-border-default flex items-center justify-center text-text-quaternary hover:text-emerald hover:bg-emerald-muted transition-all">
+                <Edit3 size={13} />
               </button>
-              <button onClick={onRemove} className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center text-white/50 hover:text-rose-500 hover:bg-rose-500/20 transition-all">
-                <X size={15} />
+              <button onClick={onRemove} className="w-7 h-7 rounded-lg border border-border-default flex items-center justify-center text-text-quaternary hover:text-rose hover:bg-rose-muted transition-all">
+                <X size={13} />
               </button>
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 relative">
+      {/* Content fills remaining height exactly — NO extra wrapping overflow */}
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         {renderContent()}
       </div>
     </div>

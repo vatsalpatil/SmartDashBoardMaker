@@ -3,15 +3,15 @@ import { forwardRef } from "react";
 
 const variants = {
   primary:
-    "bg-transparent border border-[#444] text-white hover:border-[#666] hover:bg-white/5 active:border-accent disabled:opacity-40 disabled:cursor-not-allowed",
+    "bg-accent text-white border border-accent hover:bg-accent-hover hover:border-accent-hover active:bg-accent/90 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed",
   secondary:
-    "bg-transparent border border-[#333] text-text-secondary hover:border-[#555] hover:text-white hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed",
+    "bg-bg-muted border border-border-default text-text-secondary hover:border-border-strong hover:text-text-primary hover:bg-bg-subtle disabled:opacity-40 disabled:cursor-not-allowed",
   danger:
     "bg-transparent border border-rose/30 text-rose hover:border-rose hover:bg-rose/5 disabled:opacity-40 disabled:cursor-not-allowed",
   ghost:
-    "bg-transparent border border-transparent hover:border-[#444] text-text-tertiary hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed",
+    "bg-transparent border border-transparent hover:bg-bg-muted/50 text-text-tertiary hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed",
   outline:
-    "bg-transparent border border-[#444] text-white hover:border-accent/60 hover:bg-accent/5 disabled:opacity-40 disabled:cursor-not-allowed",
+    "bg-transparent border border-border-default text-text-primary hover:border-accent/60 hover:bg-accent/5 disabled:opacity-40 disabled:cursor-not-allowed",
   success:
     "bg-transparent border border-emerald/30 text-emerald hover:border-emerald hover:bg-emerald/5 disabled:opacity-40 disabled:cursor-not-allowed",
 };
