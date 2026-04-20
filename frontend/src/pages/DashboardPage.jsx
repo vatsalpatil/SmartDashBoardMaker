@@ -40,11 +40,11 @@ import { useConfirm } from "../components/ui/ConfirmDialog";
 
 // ── Auto Refresh intervals ────────────────────────────────────────────────
 const REFRESH_OPTIONS = [
-  { label: "Off",    value: 0 },
-  { label: "5 sec",  value: 5 },
+  { label: "Off", value: 0 },
+  { label: "5 sec", value: 5 },
   { label: "30 sec", value: 30 },
-  { label: "1 min",  value: 60 },
-  { label: "5 min",  value: 300 },
+  { label: "1 min", value: 60 },
+  { label: "5 min", value: 300 },
 ];
 
 function useAutoRefresh(intervalSec, onRefresh) {
@@ -61,10 +61,10 @@ function useAutoRefresh(intervalSec, onRefresh) {
 }
 
 // ── Present (full-screen) mode overlay ───────────────────────────────────
-function PresentMode({ 
-  dashboard, 
-  filters, 
-  onExit, 
+function PresentMode({
+  dashboard,
+  filters,
+  onExit,
   refreshSignal,
   activeTabId,
   setActiveTabId,
@@ -72,10 +72,12 @@ function PresentMode({
   setRefreshInterval,
   onRefresh,
   lastRefreshed,
-  onThemeOpen
+  onThemeOpen,
 }) {
   useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onExit(); };
+    const handler = (e) => {
+      if (e.key === "Escape") onExit();
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onExit]);
@@ -84,7 +86,7 @@ function PresentMode({
   const currentTabWidgets = (dashboard?.widgets || []).filter(
     (w) =>
       w.tabId === activeTabId ||
-      (!w.tabId && activeTabId === (dashboard?.tabs?.[0]?.id || "default"))
+      (!w.tabId && activeTabId === (dashboard?.tabs?.[0]?.id || "default")),
   );
 
   return (
@@ -94,9 +96,11 @@ function PresentMode({
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 pr-4 border-r border-border-muted">
             <LayoutDashboard size={18} className="text-accent" />
-            <span className="text-[16px] font-bold text-text-primary">{dashboard.name}</span>
+            <span className="text-[16px] font-bold text-text-primary">
+              {dashboard.name}
+            </span>
           </div>
-          
+
           {/* Tabs in Present Mode */}
           <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar-mini py-0.5">
             {(dashboard.tabs || []).map((tab) => {
@@ -215,8 +219,8 @@ export default function DashboardPage() {
   const [themeOpen, setThemeOpen] = useState(false);
 
   // Auto-refresh
-  const [refreshInterval, setRefreshInterval] = useState(0);   // seconds, 0 = off
-  const [refreshSignal, setRefreshSignal] = useState(0);        // bump to trigger re-fetch
+  const [refreshInterval, setRefreshInterval] = useState(0); // seconds, 0 = off
+  const [refreshSignal, setRefreshSignal] = useState(0); // bump to trigger re-fetch
   const [lastRefreshed, setLastRefreshed] = useState(null);
 
   const doRefresh = useCallback(() => {
@@ -289,8 +293,14 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    if (activeDashboard && (!activeDashboard.tabs || activeDashboard.tabs.length === 0)) {
-      const updated = { ...activeDashboard, tabs: [{ id: "default", label: "Primary" }] };
+    if (
+      activeDashboard &&
+      (!activeDashboard.tabs || activeDashboard.tabs.length === 0)
+    ) {
+      const updated = {
+        ...activeDashboard,
+        tabs: [{ id: "default", label: "Primary" }],
+      };
       setActiveDashboard(updated);
       setActiveTabId("default");
     } else if (activeDashboard?.tabs?.length > 0 && !activeTabId) {
@@ -301,9 +311,14 @@ export default function DashboardPage() {
   const handleAddTab = async () => {
     if (!activeDashboard) return;
     const newId = crypto.randomUUID();
-    const newTabs = [...(activeDashboard.tabs || []), { id: newId, label: "New Tab" }];
+    const newTabs = [
+      ...(activeDashboard.tabs || []),
+      { id: newId, label: "New Tab" },
+    ];
     try {
-      const updated = await updateDashboard(activeDashboard.id, { tabs: newTabs });
+      const updated = await updateDashboard(activeDashboard.id, {
+        tabs: newTabs,
+      });
       setActiveDashboard(updated);
       setActiveTabId(newId);
       toast.success("Tab added");
@@ -314,10 +329,12 @@ export default function DashboardPage() {
 
   const handleRenameTab = async (tabId, newLabel) => {
     const newTabs = activeDashboard.tabs.map((t) =>
-      t.id === tabId ? { ...t, label: newLabel } : t
+      t.id === tabId ? { ...t, label: newLabel } : t,
     );
     try {
-      const updated = await updateDashboard(activeDashboard.id, { tabs: newTabs });
+      const updated = await updateDashboard(activeDashboard.id, {
+        tabs: newTabs,
+      });
       setActiveDashboard(updated);
     } catch {
       toast.error("Failed to rename tab");
@@ -334,7 +351,9 @@ export default function DashboardPage() {
     if (!ok) return;
     const newTabs = activeDashboard.tabs.filter((t) => t.id !== tabId);
     try {
-      const updated = await updateDashboard(activeDashboard.id, { tabs: newTabs });
+      const updated = await updateDashboard(activeDashboard.id, {
+        tabs: newTabs,
+      });
       setActiveDashboard(updated);
       setActiveTabId(newTabs[0].id);
     } catch {
@@ -346,10 +365,17 @@ export default function DashboardPage() {
     if (!activeDashboard) return;
     const newWidgets = [
       ...(activeDashboard.widgets || []),
-      { id: crypto.randomUUID(), viz_id: vizId, tabId: activeTabId, layout: {} },
+      {
+        id: crypto.randomUUID(),
+        viz_id: vizId,
+        tabId: activeTabId,
+        layout: {},
+      },
     ];
     try {
-      const updated = await updateDashboard(activeDashboard.id, { widgets: newWidgets });
+      const updated = await updateDashboard(activeDashboard.id, {
+        widgets: newWidgets,
+      });
       setActiveDashboard(updated);
       setShowAddWidget(false);
       toast.success("Widget added");
@@ -372,7 +398,9 @@ export default function DashboardPage() {
       return gridKey !== gridKeyToRemove;
     });
     try {
-      const updated = await updateDashboard(activeDashboard.id, { widgets: newWidgets });
+      const updated = await updateDashboard(activeDashboard.id, {
+        widgets: newWidgets,
+      });
       setActiveDashboard(updated);
     } catch {
       console.error("Remove widget failed");
@@ -398,7 +426,9 @@ export default function DashboardPage() {
   const handleFilterChange = async (filters) => {
     if (!activeDashboard) return;
     try {
-      const updated = await updateDashboard(activeDashboard.id, { global_filters: filters });
+      const updated = await updateDashboard(activeDashboard.id, {
+        global_filters: filters,
+      });
       setActiveDashboard(updated);
     } catch {
       console.error("Filter save failed");
@@ -408,7 +438,8 @@ export default function DashboardPage() {
   const currentTabWidgets = (activeDashboard?.widgets || []).filter(
     (w) =>
       w.tabId === activeTabId ||
-      (!w.tabId && activeTabId === (activeDashboard?.tabs?.[0]?.id || "default"))
+      (!w.tabId &&
+        activeTabId === (activeDashboard?.tabs?.[0]?.id || "default")),
   );
 
   // ── Dashboard List ────────────────────────────────────────────────────────
@@ -425,7 +456,10 @@ export default function DashboardPage() {
                 Combine visualizations into interactive reports
               </p>
             </div>
-            <button className="qb-btn qb-btn--primary" onClick={() => setShowCreate(true)}>
+            <button
+              className="qb-btn qb-btn--primary"
+              onClick={() => setShowCreate(true)}
+            >
               <Plus size={18} />
               <span>New Dashboard</span>
             </button>
@@ -458,11 +492,17 @@ export default function DashboardPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/3 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                   <div className="flex justify-between items-start mb-3 relative z-1">
                     <div className="w-10 h-10 rounded-lg bg-accent-muted flex items-center justify-center shrink-0 group-hover:bg-accent group-hover:scale-105 transition-all duration-300">
-                      <LayoutDashboard size={18} className="text-accent group-hover:text-white transition-colors" />
+                      <LayoutDashboard
+                        size={18}
+                        className="text-accent group-hover:text-white transition-colors"
+                      />
                     </div>
                     <button
                       className="w-7 h-7 rounded-md flex items-center justify-center text-text-quaternary hover:text-rose hover:bg-rose-muted transition-all opacity-70 hover:opacity-100"
-                      onClick={(e) => { e.stopPropagation(); handleDelete(dash.id, dash.name); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(dash.id, dash.name);
+                      }}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -494,7 +534,10 @@ export default function DashboardPage() {
           title="New Dashboard"
           footer={
             <>
-              <button className="btn-secondary text-[12px] px-4 py-1.5" onClick={() => setShowCreate(false)}>
+              <button
+                className="btn-secondary text-[12px] px-4 py-1.5"
+                onClick={() => setShowCreate(false)}
+              >
                 Cancel
               </button>
               <button
@@ -509,7 +552,9 @@ export default function DashboardPage() {
         >
           <div className="flex flex-col gap-4">
             <div>
-              <label className="block text-[12px] font-medium text-text-tertiary mb-1.5">Name</label>
+              <label className="block text-[12px] font-medium text-text-tertiary mb-1.5">
+                Name
+              </label>
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -519,7 +564,9 @@ export default function DashboardPage() {
               />
             </div>
             <div>
-              <label className="block text-[12px] font-medium text-text-tertiary mb-1.5">Description</label>
+              <label className="block text-[12px] font-medium text-text-tertiary mb-1.5">
+                Description
+              </label>
               <Textarea
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
@@ -556,9 +603,12 @@ export default function DashboardPage() {
       {/* Theme Panel */}
       <ThemePanel open={themeOpen} onClose={() => setThemeOpen(false)} />
 
-      <PageContainer fullscreen wide className="full-height-page !py-4 lg:!px-10">
+      <PageContainer
+        fullscreen
+        wide
+        className="full-height-page !py-4 lg:!px-10"
+      >
         <div className="flex flex-col gap-4 h-full">
-
           {/* TOP BAR */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-2.5">
@@ -676,7 +726,9 @@ export default function DashboardPage() {
                       <input
                         className="bg-transparent border-none outline-none text-inherit w-auto min-w-[60px]"
                         value={tab.label}
-                        onChange={(e) => handleRenameTab(tab.id, e.target.value)}
+                        onChange={(e) =>
+                          handleRenameTab(tab.id, e.target.value)
+                        }
                         onClick={(e) => isActive && e.stopPropagation()}
                       />
                     ) : (

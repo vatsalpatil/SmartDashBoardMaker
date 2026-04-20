@@ -1,41 +1,54 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { createPortal } from 'react-dom';
-import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
-import { useNavigate } from 'react-router-dom';
-import ChartPreview from '../visualizations/ChartPreview';
-import { getVisualization, executeQuery, updateVisualization } from '../../lib/api';
-import { buildSQL } from '../../lib/sqlBuilder';
-import { Spinner, EmptyState } from '../ui';
-import { LayoutDashboard, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, memo } from "react";
+import { createPortal } from "react-dom";
+import { Responsive, WidthProvider } from "react-grid-layout/legacy";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
+import { useNavigate } from "react-router-dom";
+import ChartPreview from "../visualizations/ChartPreview";
+import {
+  getVisualization,
+  executeQuery,
+  updateVisualization,
+} from "../../lib/api";
+import { buildSQL } from "../../lib/sqlBuilder";
+import { Spinner, EmptyState } from "../ui";
+import { LayoutDashboard, RefreshCw } from "lucide-react";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 // Stable filter serialisation to avoid spurious re-fetches
 const serializeFilters = (filters) => JSON.stringify(filters ?? []);
 
-const WidgetWrapper = memo(function WidgetWrapper({ vizId, filters = [], onRemove, isEditing, refreshSignal }) {
+const WidgetWrapper = memo(function WidgetWrapper({
+  vizId,
+  filters = [],
+  onRemove,
+  isEditing,
+  refreshSignal,
+}) {
   const navigate = useNavigate();
   const [viz, setViz] = useState(null);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);          // ← fix: was missing, caused crash
+  const [error, setError] = useState(null); // ← fix: was missing, caused crash
   const [localConfig, setLocalConfig] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mountedRef = useRef(true);
   const lastFiltersRef = useRef(serializeFilters(filters));
 
-  const handleConfigChange = useCallback(async (newConfig) => {
-    setLocalConfig(newConfig);
-    if (isEditing && viz) {
-      try {
-        await updateVisualization(viz.id, { config: newConfig });
-      } catch (err) {
-        console.error('Failed to save widget configuration', err);
+  const handleConfigChange = useCallback(
+    async (newConfig) => {
+      setLocalConfig(newConfig);
+      if (isEditing && viz) {
+        try {
+          await updateVisualization(viz.id, { config: newConfig });
+        } catch (err) {
+          console.error("Failed to save widget configuration", err);
+        }
       }
-    }
-  }, [isEditing, viz]);
+    },
+    [isEditing, viz],
+  );
 
   // Load viz metadata once
   useEffect(() => {
@@ -51,16 +64,18 @@ const WidgetWrapper = memo(function WidgetWrapper({ vizId, filters = [], onRemov
           chart_type: vizData.chart_type || vizData.config?.chart_type,
         });
       } catch (err) {
-        console.error('Failed to load widget:', err);
+        console.error("Failed to load widget:", err);
         if (mountedRef.current) {
           setLoading(false);
-          setError('Widget not found');
+          setError("Widget not found");
         }
         if (onRemove) onRemove();
       }
     };
     loadInit();
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, [vizId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch widget data when viz/config/filters/refreshSignal change
@@ -80,28 +95,41 @@ const WidgetWrapper = memo(function WidgetWrapper({ vizId, filters = [], onRemov
         };
         let sql = configWithFilters.custom_sql;
         const isQueryBased =
-          localConfig.source_type === 'query' ||
+          localConfig.source_type === "query" ||
           localConfig.source_query_id ||
-          (!localConfig.source_type && localConfig.custom_sql?.includes('AS q'));
+          (!localConfig.source_type &&
+            localConfig.custom_sql?.includes("AS q"));
 
         if (isQueryBased) {
           let baseQueryText = localConfig.source_query_sql;
           if (!baseQueryText && localConfig.custom_sql) {
-            const match = localConfig.custom_sql.match(/FROM\s+\((.*?)\)\s+AS\s+q/is);
+            const match = localConfig.custom_sql.match(
+              /FROM\s+\((.*?)\)\s+AS\s+q/is,
+            );
             if (match && match[1]) baseQueryText = match[1].trim();
           }
-          if (baseQueryText) sql = buildSQL(configWithFilters, null, baseQueryText) || localConfig.custom_sql;
+          if (baseQueryText)
+            sql =
+              buildSQL(configWithFilters, null, baseQueryText) ||
+              localConfig.custom_sql;
         } else {
-          const tableName = `dataset_${viz.dataset_id.replace(/-/g, '_')}`;
-          sql = buildSQL(configWithFilters, { table_name: tableName }, null) || localConfig.custom_sql;
+          const tableName = `dataset_${viz.dataset_id.replace(/-/g, "_")}`;
+          sql =
+            buildSQL(configWithFilters, { table_name: tableName }, null) ||
+            localConfig.custom_sql;
         }
 
         if (sql) {
-          const result = await executeQuery(sql, viz.dataset_id, 1, localConfig.limit || 200);
+          const result = await executeQuery(
+            sql,
+            viz.dataset_id,
+            1,
+            localConfig.limit || 200,
+          );
           if (mountedRef.current) setData(result.rows || []);
         }
       } catch (err) {
-        if (mountedRef.current) setError(err.message || 'Failed to load data');
+        if (mountedRef.current) setError(err.message || "Failed to load data");
       } finally {
         if (mountedRef.current) setLoading(false);
       }
@@ -116,7 +144,10 @@ const WidgetWrapper = memo(function WidgetWrapper({ vizId, filters = [], onRemov
         <span className="text-rose text-[12px] font-medium">⚠ {error}</span>
         <button
           className="text-[11px] text-text-tertiary underline"
-          onClick={() => { setError(null); setLoading(true); }}
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+          }}
         >
           Retry
         </button>
@@ -133,12 +164,14 @@ const WidgetWrapper = memo(function WidgetWrapper({ vizId, filters = [], onRemov
   }
 
   const content = (
-    <div className={[
-      'bg-bg-raised flex flex-col group transition-all duration-300',
-      isFullscreen
-        ? 'fixed inset-0 z-[2000] p-10 bg-[#020208]/98 backdrop-blur-3xl overflow-auto'
-        : 'h-full rounded-xl border border-border-default overflow-hidden shadow-xs hover:shadow-sm',
-    ].join(' ')}>
+    <div
+      className={[
+        "bg-bg-raised flex flex-col group transition-all duration-300",
+        isFullscreen
+          ? "fixed inset-0 z-[2000] p-10 bg-[#020208]/98 backdrop-blur-3xl overflow-auto"
+          : "h-full rounded-xl border border-border-default overflow-hidden shadow-xs hover:shadow-sm",
+      ].join(" ")}
+    >
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {viz && localConfig ? (
           <ChartPreview
@@ -146,14 +179,18 @@ const WidgetWrapper = memo(function WidgetWrapper({ vizId, filters = [], onRemov
             config={{ ...localConfig, title: viz.name }}
             height="100%"
             onConfigChange={handleConfigChange}
-            onEdit={isEditing ? () => navigate(`/visualize?edit=${vizId}`) : undefined}
+            onEdit={
+              isEditing ? () => navigate(`/visualize?edit=${vizId}`) : undefined
+            }
             onRemove={isEditing && onRemove ? () => onRemove(vizId) : undefined}
             isEditing={isEditing}
             isFullscreen={isFullscreen}
             onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
           />
         ) : (
-          <div className="text-text-quaternary text-center p-5 text-[12px] italic">Widget not found</div>
+          <div className="text-text-quaternary text-center p-5 text-[12px] italic">
+            Widget not found
+          </div>
         )}
       </div>
       {loading && data.length > 0 && (
@@ -197,16 +234,16 @@ export default function DashboardGrid({
   const safeLayout = Array.isArray(layout) ? layout : [];
   const layouts = {
     lg: normalizedWidgets.map((w, i) => {
-      const existing = safeLayout.find(l => l && l.i === w.gridKey);
-      if (existing) return { ...existing, minW: 2, minH: 2 };
+      const existing = safeLayout.find((l) => l && l.i === w.gridKey);
+      if (existing) return { ...existing, minW: 2, minH: 8 };
       return {
         i: w.gridKey,
-        x: (i % 3) * 4,
-        y: Math.floor(i / 3) * 4,
-        w: 4,
-        h: 4,
+        x: (i % 3) * 8,
+        y: Math.floor(i / 3) * 19,
+        w: 8,
+        h: 19,
         minW: 2,
-        minH: 2,
+        minH: 8,
       };
     }),
   };
@@ -224,17 +261,17 @@ export default function DashboardGrid({
           className="layout"
           layouts={layouts}
           breakpoints={{ lg: 1200, md: 996, sm: 768 }}
-          cols={{ lg: 12, md: 8, sm: 4 }}
-          rowHeight={80}
+          cols={{ lg: 24, md: 16, sm: 8 }}
+          rowHeight={10}
           isDraggable={editing}
           isResizable={editing}
           draggableCancel=".nodrag, button, select, input, .recharts-wrapper"
           onLayoutChange={(newLayout) => onLayoutChange?.(newLayout)}
           compactType="vertical"
-          margin={[16, 16]}
+          margin={[12, 12]}
         >
           {normalizedWidgets.map((w) => (
-            <div key={w.gridKey} className={editing ? 'cursor-move' : ''}>
+            <div key={w.gridKey} className={editing ? "cursor-move" : ""}>
               <WidgetWrapper
                 vizId={w.viz_id}
                 filters={filters}
