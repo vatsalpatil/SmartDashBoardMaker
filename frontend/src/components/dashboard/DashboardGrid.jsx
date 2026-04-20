@@ -4,7 +4,7 @@ import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { useNavigate } from "react-router-dom";
-import ChartPreview from "../visualizations/ChartPreview";
+import DashboardChartPreview from "./DashboardChartPreview";
 import {
   getVisualization,
   executeQuery,
@@ -174,7 +174,7 @@ const WidgetWrapper = memo(function WidgetWrapper({
     >
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {viz && localConfig ? (
-          <ChartPreview
+          <DashboardChartPreview
             data={data}
             config={{ ...localConfig, title: viz.name }}
             height="100%"
@@ -235,15 +235,15 @@ export default function DashboardGrid({
   const layouts = {
     lg: normalizedWidgets.map((w, i) => {
       const existing = safeLayout.find((l) => l && l.i === w.gridKey);
-      if (existing) return { ...existing, minW: 2, minH: 8 };
+      if (existing) return { ...existing, minW: 4, minH: 12 };
       return {
         i: w.gridKey,
-        x: (i % 3) * 8,
-        y: Math.floor(i / 3) * 19,
-        w: 8,
-        h: 19,
-        minW: 2,
-        minH: 8,
+        x: (i % 3) * 16,
+        y: Math.floor(i / 3) * 23,
+        w: 16,
+        h: 23,
+        minW: 4,
+        minH: 12,
       };
     }),
   };
@@ -261,14 +261,14 @@ export default function DashboardGrid({
           className="layout"
           layouts={layouts}
           breakpoints={{ lg: 1200, md: 996, sm: 768 }}
-          cols={{ lg: 24, md: 16, sm: 8 }}
-          rowHeight={10}
+          cols={{ lg: 48, md: 32, sm: 16 }}
+          rowHeight={5}
           isDraggable={editing}
           isResizable={editing}
           draggableCancel=".nodrag, button, select, input, .recharts-wrapper"
           onLayoutChange={(newLayout) => onLayoutChange?.(newLayout)}
           compactType="vertical"
-          margin={[12, 12]}
+          margin={[6, 6]}
         >
           {normalizedWidgets.map((w) => (
             <div key={w.gridKey} className={editing ? "cursor-move" : ""}>

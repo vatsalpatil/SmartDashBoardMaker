@@ -232,6 +232,8 @@ export default function DashboardPage() {
 
   const [activeTabId, setActiveTabId] = useState(null);
 
+
+
   useEffect(() => {
     loadDashboards();
     listVisualizations()
@@ -606,36 +608,91 @@ export default function DashboardPage() {
       <PageContainer
         fullscreen
         wide
-        className="full-height-page !py-4 lg:!px-10"
+        className="full-height-page !py-2 lg:!px-6"
       >
-        <div className="flex flex-col gap-4 h-full">
-          {/* TOP BAR */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2.5">
+        <div className="flex flex-col gap-2 h-full">
+          {/* TOP BAR — merged with Tabs */}
+          <div className="flex items-center gap-2 shrink-0 overflow-x-auto custom-scrollbar-mini flex-nowrap">
+            {/* Left: close + name */}
+            <div className="flex items-center gap-2 shrink-0">
               <button
-                className="btn-secondary px-3 py-1.5 text-[11px] gap-1.5"
+                className="btn-secondary px-2.5 py-1 text-[10px] gap-1"
                 onClick={() => setActiveDashboard(null)}
               >
-                <X size={13} />
+                <X size={11} />
                 Close
               </button>
-              <div className="h-4 w-px bg-border-default" />
-              <h2 className="text-[15px] font-semibold text-text-primary flex items-center gap-2">
-                <LayoutDashboard size={15} className="text-accent" />
+              <div className="h-4 w-px bg-border-default shrink-0" />
+              <h2 className="text-[12px] font-semibold text-text-primary flex items-center gap-1.5 shrink-0">
+                <LayoutDashboard size={12} className="text-accent" />
                 {activeDashboard.name}
               </h2>
+              <div className="h-4 w-px bg-border-muted shrink-0" />
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* ── Auto Refresh Control ── */}
-              <div className="flex items-center gap-1.5 bg-bg-raised border border-border-default rounded-lg px-2.5 py-1.5">
+            {/* TABS inline */}
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(activeDashboard.tabs || []).map((tab) => {
+                const isActive = activeTabId === tab.id;
+                return (
+                  <div key={tab.id} className="flex items-center group/tab">
+                    <button
+                      onClick={() => setActiveTabId(tab.id)}
+                      className={[
+                        "px-3 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1.5 whitespace-nowrap",
+                        isActive
+                          ? "bg-accent text-white shadow-glow"
+                          : "text-text-tertiary hover:bg-white/5 hover:text-text-primary",
+                      ].join(" ")}
+                    >
+                      {editing ? (
+                        <input
+                          className="bg-transparent border-none outline-none text-inherit w-auto min-w-[50px]"
+                          value={tab.label}
+                          onChange={(e) =>
+                            handleRenameTab(tab.id, e.target.value)
+                          }
+                          onClick={(e) => isActive && e.stopPropagation()}
+                        />
+                      ) : (
+                        tab.label
+                      )}
+                    </button>
+                    {editing && activeDashboard.tabs.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveTab(tab.id)}
+                        className="w-0 group-hover/tab:w-5 overflow-hidden flex items-center justify-center text-text-quaternary hover:text-rose transition-all"
+                      >
+                        <X size={9} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {editing && (
+                <button
+                  onClick={handleAddTab}
+                  className="px-2 py-1 rounded-md text-text-quaternary hover:text-accent hover:bg-accent/10 transition-all"
+                >
+                  <Plus size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Right: controls */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Auto Refresh */}
+              <div className="flex items-center gap-1 bg-bg-raised border border-border-default rounded-md px-2 py-1">
                 <RefreshCw
-                  size={12}
+                  size={10}
                   className={`text-accent ${refreshInterval > 0 ? "animate-spin" : ""}`}
                   style={{ animationDuration: "3s" }}
                 />
                 <select
-                  className="bg-transparent text-[11px] text-text-tertiary outline-none cursor-pointer"
+                  className="bg-transparent text-[10px] text-text-tertiary outline-none cursor-pointer"
                   value={refreshInterval}
                   onChange={(e) => setRefreshInterval(Number(e.target.value))}
                 >
@@ -646,49 +703,50 @@ export default function DashboardPage() {
                   ))}
                 </select>
                 <button
-                  className="ml-1 text-text-quaternary hover:text-accent transition-colors"
+                  className="text-text-quaternary hover:text-accent transition-colors"
                   title="Refresh now"
                   onClick={doRefresh}
                 >
-                  <Play size={11} />
+                  <Play size={9} />
                 </button>
               </div>
 
               {/* Last refreshed */}
               {lastRefreshed && (
-                <span className="text-[10px] text-text-quaternary flex items-center gap-1">
-                  <Clock size={10} />
+                <span className="text-[9px] text-text-quaternary flex items-center gap-1">
+                  <Clock size={9} />
                   {lastRefreshed.toLocaleTimeString()}
                 </span>
               )}
 
-              {/* Present button */}
+
+              {/* Present */}
               <button
-                className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-violet/10 text-violet hover:bg-violet/20 transition-all flex items-center gap-1.5 border border-violet/20"
+                className="px-2.5 py-1 text-[10px] font-bold rounded-md bg-violet/10 text-violet hover:bg-violet/20 transition-all flex items-center gap-1 border border-violet/20"
                 onClick={() => setPresenting(true)}
                 title="Present dashboard in full screen (ESC to exit)"
               >
-                <Monitor size={13} />
+                <Monitor size={11} />
                 Present
               </button>
 
-              {/* Theme Selection */}
+              {/* Theme */}
               <button
-                className="btn-secondary px-3 py-1.5 text-[11px] gap-1.5"
+                className="btn-secondary px-2.5 py-1 text-[10px] gap-1"
                 onClick={() => setThemeOpen(true)}
                 title="Theme Settings"
               >
-                <Palette size={13} />
+                <Palette size={11} />
                 Theme
               </button>
 
               {/* Add Widget */}
               {editing && (
                 <button
-                  className="btn-secondary px-3 py-1.5 text-[11px] gap-1.5"
+                  className="btn-secondary px-2.5 py-1 text-[10px] gap-1"
                   onClick={() => setShowAddWidget(true)}
                 >
-                  <Plus size={13} />
+                  <Plus size={11} />
                   Add Widget
                 </button>
               )}
@@ -696,64 +754,15 @@ export default function DashboardPage() {
               {/* Edit / Done */}
               <button
                 className={[
-                  "px-4 py-1.5 text-[11px] font-medium rounded-lg transition-all flex items-center gap-1.5",
+                  "px-3 py-1 text-[10px] font-medium rounded-md transition-all flex items-center gap-1",
                   editing ? "bg-emerald text-white" : "btn-primary",
                 ].join(" ")}
                 onClick={() => setEditing(!editing)}
               >
-                {editing ? <Save size={13} /> : <Edit3 size={13} />}
+                {editing ? <Save size={11} /> : <Edit3 size={11} />}
                 {editing ? "Done Editing" : "Edit"}
               </button>
             </div>
-          </div>
-
-          {/* TABS RIBBON */}
-          <div className="flex items-center gap-1 bg-bg-raised border border-border-default rounded-xl p-1 shrink-0 overflow-x-auto custom-scrollbar-mini">
-            {(activeDashboard.tabs || []).map((tab) => {
-              const isActive = activeTabId === tab.id;
-              return (
-                <div key={tab.id} className="flex items-center group/tab">
-                  <button
-                    onClick={() => setActiveTabId(tab.id)}
-                    className={[
-                      "px-4 py-2 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 whitespace-nowrap",
-                      isActive
-                        ? "bg-accent text-white shadow-glow"
-                        : "text-text-tertiary hover:bg-white/5 hover:text-text-primary",
-                    ].join(" ")}
-                  >
-                    {editing ? (
-                      <input
-                        className="bg-transparent border-none outline-none text-inherit w-auto min-w-[60px]"
-                        value={tab.label}
-                        onChange={(e) =>
-                          handleRenameTab(tab.id, e.target.value)
-                        }
-                        onClick={(e) => isActive && e.stopPropagation()}
-                      />
-                    ) : (
-                      tab.label
-                    )}
-                  </button>
-                  {editing && activeDashboard.tabs.length > 1 && (
-                    <button
-                      onClick={() => handleRemoveTab(tab.id)}
-                      className="w-0 group-hover/tab:w-6 overflow-hidden flex items-center justify-center text-text-quaternary hover:text-rose transition-all"
-                    >
-                      <X size={10} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-            {editing && (
-              <button
-                onClick={handleAddTab}
-                className="px-3 py-2 rounded-lg text-text-quaternary hover:text-accent hover:bg-accent/10 transition-all ml-1"
-              >
-                <Plus size={14} />
-              </button>
-            )}
           </div>
 
           {/* Global Filters */}
@@ -806,7 +815,7 @@ export default function DashboardPage() {
           </Modal>
 
           {/* Grid Container */}
-          <div className="flex-1 min-h-0 bg-bg-surface rounded-xl border border-border-default overflow-y-auto p-3 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             <DashboardGrid
               widgets={currentTabWidgets}
               layout={activeDashboard.layout || []}

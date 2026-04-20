@@ -65,17 +65,17 @@ const tooltipStyle = {
   contentStyle: {
     background: "rgba(10, 10, 20, 0.9)",
     border: "1px solid rgba(255, 255, 255, 0.1)",
-    borderRadius: "12px",
-    fontSize: "12px",
+    borderRadius: "8px",
+    fontSize: "10px",
     color: "#fff",
     backdropFilter: "blur(20px)",
-    boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
-    padding: "12px 16px",
-    fontWeight: "bold",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+    padding: "6px 10px",
+    fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
   },
-  itemStyle: { padding: "3px 0" },
+  itemStyle: { padding: "2px 0" },
   cursor: { stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 },
 };
 
@@ -88,7 +88,7 @@ const formatValue = (value) => {
   return value.toLocaleString();
 };
 
-export default function ChartPreview({
+export default function DashboardChartPreview({
   data,
   config,
   onConfigChange,
@@ -106,7 +106,7 @@ export default function ChartPreview({
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-white/20 animate-in fade-in duration-700">
         <Activity size={40} strokeWidth={1} className="animate-pulse" />
-        <span className="text-[10px] font-black uppercase tracking-[0.3em]">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.3em]">
           Neural Interface Ready // Awaiting Pipeline
         </span>
       </div>
@@ -197,7 +197,7 @@ export default function ChartPreview({
       return (
         <div className="flex flex-col items-center justify-center h-full gap-4 text-white/10">
           <Layers size={32} />
-          <span className="text-[9px] font-black uppercase tracking-widest">
+          <span className="text-[9px] font-semibold uppercase tracking-widest">
             Assign Metrics to Begin Compilation
           </span>
         </div>
@@ -267,13 +267,13 @@ export default function ChartPreview({
                   <th
                     key={c}
                     style={{ background: "var(--color-bg-overlay)" }}
-                    className="text-left px-4 py-2 text-[14px] font-black text-text-tertiary uppercase tracking-widest border-b border-border-default whitespace-nowrap"
+                    className="text-left px-2 py-1 text-[10px] font-bold text-text-tertiary uppercase tracking-widest border-b border-border-default whitespace-nowrap"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {c}
                       <div className="flex flex-col opacity-30">
-                        <ChevronDown size={10} className="rotate-180 -mb-1" />
-                        <ChevronDown size={10} />
+                        <ChevronDown size={8} className="rotate-180 -mb-0.5" />
+                        <ChevronDown size={8} />
                       </div>
                     </div>
                   </th>
@@ -289,7 +289,7 @@ export default function ChartPreview({
                     return (
                       <td
                         key={c}
-                        className={`px-4 py-2.5 text-[16px] border-b border-border-muted whitespace-nowrap ${isNum ? "font-black text-text-primary tabular-nums tracking-wide" : "font-bold text-text-secondary"}`}
+                        className={`px-2 py-1 text-[11px] border-b border-border-muted whitespace-nowrap ${isNum ? "font-semibold text-text-primary tabular-nums tracking-wide" : "font-medium text-text-secondary"}`}
                       >
                         {isNum
                           ? val.toLocaleString(undefined, {
@@ -319,12 +319,12 @@ export default function ChartPreview({
                     <td
                       key={`total-${c}`}
                       title={isNum ? val.toLocaleString() : undefined}
-                      className="px-4 py-3 text-[16px] font-black text-emerald border-t border-border-strong whitespace-nowrap tracking-wide"
+                      className="px-2 py-1.5 text-[11px] font-bold text-emerald border-t border-border-strong whitespace-nowrap tracking-wide"
                     >
                       {idx === 0 ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button className="bg-transparent text-emerald font-black uppercase outline-none cursor-pointer border-b border-emerald/20 hover:border-emerald text-[13px] nodrag transition-all flex items-center gap-1">
+                            <button className="bg-transparent text-emerald font-bold uppercase outline-none cursor-pointer border-b border-emerald/20 hover:border-emerald text-[10px] nodrag transition-all flex items-center gap-1">
                               {aggMode}{" "}
                               <ChevronDown size={10} className="opacity-50" />
                             </button>
@@ -371,7 +371,7 @@ export default function ChartPreview({
         return (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-white/10">
             <Layers size={32} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-center leading-relaxed">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-center leading-relaxed">
               Pivot Requires 2 Dimensions & 1 Metric
               <br />
               <span className="text-white/40 font-medium">
@@ -395,7 +395,7 @@ export default function ChartPreview({
         return (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-white/10">
             <Loader2 size={32} className="animate-spin" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-center">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-center">
               Compiling Matrix...
               <br />
               <span className="text-white/40 font-medium text-[9px] lowercase">
@@ -466,13 +466,13 @@ export default function ChartPreview({
                     background: "var(--color-bg-overlay)",
                     backdropFilter: "blur(8px)",
                   }}
-                  className="text-left px-4 py-2 text-[13px] font-black text-text-quaternary uppercase tracking-[0.2em] border-b border-r border-border-default whitespace-nowrap shadow-sm"
+                  className="text-left px-2 py-1.5 text-[10px] font-bold text-text-quaternary uppercase tracking-[0.1em] border-b border-r border-border-default whitespace-nowrap shadow-sm"
                 >
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-accent underline decoration-accent/30 underline-offset-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-accent underline decoration-accent/30 underline-offset-2">
                       {rowDim}
                     </span>
-                    <span className="text-text-quaternary opacity-40 ml-4">
+                    <span className="text-text-quaternary opacity-40 ml-2">
                       ↳ {colDim}
                     </span>
                   </div>
@@ -486,7 +486,7 @@ export default function ChartPreview({
                         background: "var(--color-bg-overlay)",
                         backdropFilter: "blur(8px)",
                       }}
-                      className="text-right px-5 py-2 text-[14px] font-black text-text-tertiary tracking-widest border-b border-border-default whitespace-nowrap uppercase shadow-sm"
+                      className="text-right px-3 py-1.5 text-[10px] font-bold text-text-tertiary tracking-widest border-b border-border-default whitespace-nowrap uppercase shadow-sm"
                     >
                       {c === "null" || c === "" ? (
                         <span className="italic opacity-30 text-[10px]">
@@ -503,7 +503,7 @@ export default function ChartPreview({
                     background: "var(--color-bg-overlay)",
                     backdropFilter: "blur(8px)",
                   }}
-                  className="text-right px-5 py-2 text-[14px] font-black text-emerald uppercase tracking-widest border-b border-l border-border-strong whitespace-nowrap shadow-md"
+                  className="text-right px-3 py-1.5 text-[10px] font-bold text-emerald uppercase tracking-widest border-b border-l border-border-strong whitespace-nowrap shadow-md"
                 >
                   Total
                 </th>
@@ -519,7 +519,7 @@ export default function ChartPreview({
                     key={i}
                     className="hover:bg-bg-muted/40 transition-colors group/row"
                   >
-                    <td className="px-4 py-2.5 text-[15px] border-r border-border-muted whitespace-nowrap font-black text-text-secondary bg-bg-surface/50">
+                    <td className="px-2 py-1 text-[10px] border-r border-border-muted whitespace-nowrap font-bold text-text-secondary bg-bg-surface/50">
                       {r === "null" || r === "" ? (
                         <span className="italic opacity-30 text-[10px]">
                           Unknown
@@ -538,7 +538,7 @@ export default function ChartPreview({
                       return (
                         <td
                           key={c}
-                          className="px-5 py-2.5 text-[16px] whitespace-nowrap text-right tabular-nums text-text-primary font-black tracking-wide group-hover/row:text-accent transition-colors"
+                          className="px-3 py-1 text-[10px] whitespace-nowrap text-right tabular-nums text-text-primary font-semibold tracking-wide group-hover/row:text-accent transition-colors"
                         >
                           {val !== undefined
                             ? val.toLocaleString(undefined, {
@@ -548,7 +548,7 @@ export default function ChartPreview({
                         </td>
                       );
                     })}
-                    <td className="px-5 py-2.5 text-[16px] border-l border-border-strong whitespace-nowrap text-right tabular-nums font-black text-emerald bg-emerald/[0.02] shadow-inner tracking-wide">
+                    <td className="px-3 py-1 text-[10px] border-l border-border-strong whitespace-nowrap text-right tabular-nums font-bold text-emerald bg-emerald/[0.02] shadow-inner tracking-wide">
                       {hasValues
                         ? rowTotal.toLocaleString(undefined, {
                             maximumFractionDigits: 2,
@@ -566,11 +566,11 @@ export default function ChartPreview({
                     background: "var(--color-bg-overlay)",
                     backdropFilter: "blur(8px)",
                   }}
-                  className="px-4 py-3 text-[16px] font-black border-t border-r border-border-strong whitespace-nowrap shadow-[0_-2px_10px_rgba(0,0,0,0.1)]"
+                  className="px-2 py-2 text-[11px] font-bold border-t border-r border-border-strong whitespace-nowrap shadow-[0_-2px_10px_rgba(0,0,0,0.1)]"
                 >
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="bg-emerald-muted text-emerald font-black uppercase outline-none cursor-pointer px-2 py-1 rounded text-[9px] tracking-tighter hover:bg-emerald hover:text-white transition-all flex items-center gap-1.5">
+                      <button className="bg-emerald-muted text-emerald font-bold uppercase outline-none cursor-pointer px-2 py-1 rounded text-[9px] tracking-tighter hover:bg-emerald hover:text-white transition-all flex items-center gap-1.5">
                         {aggMode}{" "}
                         <ChevronDown size={10} className="stroke-[3]" />
                       </button>
@@ -611,7 +611,7 @@ export default function ChartPreview({
                         background: "var(--color-bg-overlay)",
                         backdropFilter: "blur(8px)",
                       }}
-                      className="px-5 py-3 text-[16px] font-black border-t border-border-strong whitespace-nowrap text-right text-emerald tabular-nums shadow-[0_-2px_10px_rgba(0,0,0,0.1)] tracking-wide"
+                      className="px-3 py-2 text-[11px] font-bold border-t border-border-strong whitespace-nowrap text-right text-emerald tabular-nums shadow-[0_-2px_10px_rgba(0,0,0,0.1)] tracking-wide"
                     >
                       {hasValues
                         ? colTotal.toLocaleString(undefined, {
@@ -626,7 +626,7 @@ export default function ChartPreview({
                     background: "var(--color-bg-overlay)",
                     backdropFilter: "blur(8px)",
                   }}
-                  className="px-5 py-3 text-[17px] font-black border-t border-l border-border-strong whitespace-nowrap text-right text-emerald tabular-nums bg-emerald/10 shadow-[0_-2px_10px_rgba(0,0,0,0.2)] tracking-wide"
+                  className="px-3 py-2 text-[11px] font-bold border-t border-l border-border-strong whitespace-nowrap text-right text-emerald tabular-nums bg-emerald/10 shadow-[0_-2px_10px_rgba(0,0,0,0.2)] tracking-wide"
                 >
                   {rowVals
                     .reduce((acc, rv) => {
@@ -662,14 +662,14 @@ export default function ChartPreview({
 
       return (
         <div
-          className="flex flex-col items-center justify-center h-full space-y-2 group/kpi relative cursor-default"
+          className="flex flex-col items-center justify-center h-full space-y-1 group/kpi relative cursor-default"
           title={exactVal}
         >
-          <span className="text-6xl font-black text-white tracking-tighter drop-shadow-2xl">
+          <span className="text-3xl font-bold text-white tracking-tighter drop-shadow-2xl">
             {displayVal}
           </span>
 
-          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">
+          <span className="text-[9px] font-semibold text-white/20 uppercase tracking-[0.3em]">
             {config.title || yFields[0]}
           </span>
         </div>
@@ -707,6 +707,7 @@ export default function ChartPreview({
       chartType === "rose" ||
       chartType === "nested_donut"
     ) {
+      // For nested_donut render multiple concentric rings, one per yField
       if (chartType === "nested_donut") {
         const rings = yFields.slice(0, 4);
         const totalR = 85;
@@ -738,13 +739,14 @@ export default function ChartPreview({
               })}
               <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} />
               {config.legend_position !== "hidden" && (
-                <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={36} />
+                <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
               )}
             </RePieChart>
           </ChartContainer>
         );
       }
 
+      // Active-sector donut: highlight hovered slice
       const isDonut = chartType === "donut";
       const isRose = chartType === "rose";
       const showInnerText = config.inner_text && isDonut;
@@ -764,6 +766,8 @@ export default function ChartPreview({
               outerRadius={outerR}
               paddingAngle={isRose ? 4 : 2}
               stroke="none"
+              // Rose chart: variable outer radius via custom shape is complex;
+              // use paddingAngle variation and slightly larger slices for visual effect
               startAngle={isRose ? 90 : 0}
               endAngle={isRose ? 450 : 360}
               activeIndex={config.active_sector ? undefined : -1}
@@ -780,7 +784,7 @@ export default function ChartPreview({
                 <LabelList
                   dataKey={xField}
                   position="outside"
-                  style={{ fontSize: 10, fill: "var(--color-text-tertiary)", fontWeight: 600 }}
+                  style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 600 }}
                 />
               )}
               {showInnerText && (
@@ -797,17 +801,17 @@ export default function ChartPreview({
                         >
                           <tspan
                             x={viewBox.cx}
-                            y={viewBox.cy - 6}
-                            className="fill-text-primary text-2xl font-bold"
+                            y={viewBox.cy - 4}
+                            className="fill-text-primary text-xl font-bold"
                           >
                             {formatValue(totalVal)}
                           </tspan>
                           <tspan
                             x={viewBox.cx}
-                            y={viewBox.cy + 16}
-                            className="fill-text-quaternary text-[11px] font-bold tracking-widest uppercase"
+                            y={viewBox.cy + 12}
+                            className="fill-text-quaternary text-[9px] font-bold tracking-widest uppercase"
                           >
-                            Total {yFields[0]}
+                            Total
                           </tspan>
                         </text>
                       );
@@ -818,7 +822,7 @@ export default function ChartPreview({
             </Pie>
             <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} />
             {config.legend_position !== "hidden" && (
-              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={36} />
+              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
             )}
           </RePieChart>
         </ChartContainer>
@@ -834,7 +838,7 @@ export default function ChartPreview({
             <PolarGrid stroke="var(--color-border-muted)" strokeOpacity={0.2} />
             <PolarAngleAxis
               dataKey={xField}
-              tick={{ fill: "var(--color-text-tertiary)", fontSize: 10, fontWeight: "bold" }}
+              tick={{ fill: "var(--color-text-tertiary)", fontSize: 8, fontWeight: "600" }}
             />
             <PolarRadiusAxis angle={30} domain={[0, "auto"]} tick={false} axisLine={false} />
             {yFields.map((f, i) => (
@@ -845,7 +849,7 @@ export default function ChartPreview({
                 stroke={palette[i % palette.length]}
                 fill={palette[i % palette.length]}
                 fillOpacity={fillOp}
-                dot={config.show_markers ? { r: 4, fill: palette[i % palette.length] } : false}
+                dot={config.show_markers ? { r: 3, fill: palette[i % palette.length] } : false}
               />
             ))}
             <ChartTooltip
@@ -853,7 +857,7 @@ export default function ChartPreview({
               content={<ChartTooltipContent formatter={(v) => formatValue(v)} />}
             />
             {config.legend_position !== "hidden" && (
-              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={36} />
+              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
             )}
           </RadarChart>
         </ChartContainer>
@@ -864,10 +868,10 @@ export default function ChartPreview({
     if (chartType === "radial_bar") {
       return (
         <ChartContainer config={chartConfig} className="h-full w-full">
-          <RadialBarChart cx="50%" cy="50%" innerRadius="10%" outerRadius="80%" barSize={10} data={resolvedData}>
+          <RadialBarChart cx="50%" cy="50%" innerRadius="10%" outerRadius="80%" barSize={7} data={resolvedData}>
             <RadialBar
               minAngle={15}
-              label={config.show_data_labels ? { position: "insideStart", fill: "#fff", fontSize: 10 } : false}
+              label={config.show_data_labels ? { position: "insideStart", fill: "#fff", fontSize: 8 } : false}
               background
               clockWise
               dataKey={yFields[0]}
@@ -879,7 +883,7 @@ export default function ChartPreview({
             </RadialBar>
             <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} />
             {config.legend_position !== "hidden" && (
-              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={36} />
+              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
             )}
           </RadialBarChart>
         </ChartContainer>
@@ -894,6 +898,7 @@ export default function ChartPreview({
     const isPercentArea = chartType === "percent_area";
     const isAnyStacked  = isStackedBar || isPercentBar || isStackedArea || isPercentArea;
 
+    // For percent stacking, compute per-row totals
     const percentTotals = (isPercentBar || isPercentArea)
       ? resolvedData.map(row => yFields.reduce((s, f) => s + (Number(row[f]) || 0), 0))
       : null;
@@ -912,9 +917,10 @@ export default function ChartPreview({
         <ComposedChart
           data={stackedResolvedData}
           layout={isHorizontal ? "vertical" : "horizontal"}
-          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
         >
           {gradientDefs}
+          {/* Zero reference line for negative-bar charts */}
           {(config.conditional_color || chartType === "bar") && !isHorizontal && (
             <ReferenceLine yAxisId="left" y={0} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
           )}
@@ -924,21 +930,23 @@ export default function ChartPreview({
             strokeOpacity={0.2}
             vertical={false}
           />
+          {/* ── AXES ── */}
           {isHorizontal ? (
             <>
+              {/* Horizontal bar: category axis on Y, value axis on X */}
               <YAxis
                 yAxisId="left"
                 dataKey={xField}
                 type="category"
-                width={80}
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 11, fontWeight: "bold" }}
-                tickFormatter={(v) => String(v).length > 12 ? String(v).slice(0, 12) + "…" : String(v)}
+                width={72}
+                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
+                tickFormatter={(v) => String(v).length > 10 ? String(v).slice(0, 10) + "…" : String(v)}
                 axisLine={false}
                 tickLine={false}
               />
               <XAxis
                 type="number"
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 11, fontWeight: "bold" }}
+                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
                 tickFormatter={formatValue}
                 axisLine={false}
                 tickLine={false}
@@ -949,7 +957,7 @@ export default function ChartPreview({
               <XAxis
                 dataKey={xField}
                 type="category"
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 11, fontWeight: "bold" }}
+                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
                 tickFormatter={(v) => String(v).length > 12 ? String(v).slice(0, 12) + "…" : String(v)}
                 axisLine={false}
                 tickLine={false}
@@ -959,20 +967,20 @@ export default function ChartPreview({
                 type="number"
                 domain={isPercentBar || isPercentArea ? [0, 100] : ["auto", "auto"]}
                 tickFormatter={isPercentBar || isPercentArea ? (v) => `${v}%` : formatValue}
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 11, fontWeight: "bold" }}
+                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
                 axisLine={false}
                 tickLine={false}
-                width={40}
+                width={36}
               />
               {!isAnyStacked && yFields.length > 1 && (
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fill: "var(--color-text-tertiary)", fontSize: 11, fontWeight: "bold" }}
+                  tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
                   tickFormatter={formatValue}
                   axisLine={false}
                   tickLine={false}
-                  width={36}
+                  width={32}
                 />
               )}
             </>
@@ -981,7 +989,10 @@ export default function ChartPreview({
             cursor={{ stroke: "var(--color-accent)", strokeWidth: 1, strokeDasharray: "4 4" }}
             content={
               <ChartTooltipContent
-                formatter={(v, name) => [(isPercentBar || isPercentArea) ? `${Number(v).toFixed(1)}%` : formatValue(v), name]}
+                formatter={(v, name) => [
+                  (isPercentBar || isPercentArea) ? `${Number(v).toFixed(1)}%` : formatValue(v),
+                  name
+                ]}
               />
             }
           />
@@ -989,15 +1000,19 @@ export default function ChartPreview({
             <ChartLegend content={<ChartLegendContent />} verticalAlign="top" align="center" />
           )}
 
+          {/* ── SERIES ── */}
           {yFields.map((f, i) => {
             const color = palette[i % palette.length];
+            // Determine per-field series type for composed charts
             let seriesType = chartType;
             if (chartType === "composed") {
               const defaults = config.default_series || {};
               seriesType = defaults[i] || (i === 0 ? "bar" : "line");
             }
+
             const axisId = isHorizontal ? "left" : (config.y_axis_assign?.[f] || (i === 0 ? "left" : "right"));
 
+            // ── BAR variants ──
             if (
               seriesType === "bar" ||
               seriesType === "horizontal_bar" ||
@@ -1011,13 +1026,18 @@ export default function ChartPreview({
                   dataKey={f}
                   stackId={isAnyStacked && (isStackedBar || isPercentBar) ? "stack" : undefined}
                   radius={isAnyStacked && i === yFields.length - 1 ? [4, 4, 0, 0] : isAnyStacked ? [0, 0, 0, 0] : [4, 4, 0, 0]}
-                  barSize={isHorizontal ? 14 : 24}
+                  barSize={isHorizontal ? 10 : 14}
                   isAnimationActive={false}
                   layout={isHorizontal ? "vertical" : "horizontal"}
                 >
+                  {/* Conditional coloring (positive = green, negative = red) */}
                   {config.conditional_color
                     ? resolvedData.map((row, ri) => (
-                        <Cell key={ri} fill={(Number(row[f]) || 0) >= 0 ? "#22c55e" : "#ef4444"} fillOpacity={0.85} />
+                        <Cell
+                          key={ri}
+                          fill={(Number(row[f]) || 0) >= 0 ? "#22c55e" : "#ef4444"}
+                          fillOpacity={0.85}
+                        />
                       ))
                     : resolvedData.map((_, ri) => (
                         <Cell key={ri} fill={isAnyStacked ? color : (yFields.length === 1 ? color : palette[i % palette.length])} fillOpacity={0.85} />
@@ -1027,7 +1047,7 @@ export default function ChartPreview({
                     <LabelList
                       dataKey={f}
                       position={isHorizontal ? "right" : "top"}
-                      style={{ fontSize: 10, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
+                      style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
                       formatter={formatValue}
                     />
                   )}
@@ -1035,6 +1055,7 @@ export default function ChartPreview({
               );
             }
 
+            // ── LINE variants ──
             if (seriesType === "line") {
               return (
                 <Line
@@ -1045,17 +1066,17 @@ export default function ChartPreview({
                   strokeWidth={2}
                   type={curveType}
                   dot={config.show_markers || config.custom_dots
-                    ? { r: config.custom_dots ? 6 : 4, fill: color, stroke: "var(--color-bg-raised)", strokeWidth: 2 }
+                    ? { r: config.custom_dots ? 5 : 3, fill: color, stroke: "var(--color-bg-raised)", strokeWidth: 2 }
                     : { r: 0 }
                   }
-                  activeDot={{ r: 6 }}
+                  activeDot={{ r: 5 }}
                   isAnimationActive={false}
                 >
                   {config.show_data_labels && (
                     <LabelList
                       dataKey={f}
                       position="top"
-                      style={{ fontSize: 10, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
+                      style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
                       formatter={formatValue}
                     />
                   )}
@@ -1063,6 +1084,7 @@ export default function ChartPreview({
               );
             }
 
+            // ── AREA variants (area / stacked_area / percent_area) ──
             if (
               seriesType === "area" ||
               seriesType === "stacked_area" ||
@@ -1083,17 +1105,17 @@ export default function ChartPreview({
                   fillOpacity={config.gradient_fill || isStackedArea || isPercentArea ? 1 : 0.15}
                   type={curveType}
                   dot={config.show_markers
-                    ? { r: 4, fill: color, stroke: "var(--color-bg-raised)", strokeWidth: 2 }
+                    ? { r: 3, fill: color, stroke: "var(--color-bg-raised)", strokeWidth: 2 }
                     : false
                   }
-                  activeDot={{ r: 6 }}
+                  activeDot={{ r: 5 }}
                   isAnimationActive={false}
                 >
                   {config.show_data_labels && (
                     <LabelList
                       dataKey={f}
                       position="top"
-                      style={{ fontSize: 10, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
+                      style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
                       formatter={formatValue}
                     />
                   )}
@@ -1110,16 +1132,16 @@ export default function ChartPreview({
 
   return (
     <div
-      className="flex flex-col h-full w-full p-2.5 group/preview"
+      className="flex flex-col h-full w-full p-1.5 group/preview"
       style={{ background: "var(--color-bg-raised)" }}
     >
       {/* ── HEADER ── */}
-      <div className="relative flex items-center justify-between mb-2 z-20 shrink-0">
+      <div className="relative flex items-center justify-between mb-1 z-20 shrink-0">
         <div
           className="flex-1 drag-handle cursor-move select-none min-w-0"
           title="Drag to move widget"
         >
-          <h3 className="text-[14px] font-bold text-text-primary truncate pr-2">
+          <h3 className="text-[11px] font-bold text-text-primary truncate pr-1">
             {config.title || "Live Insight"}
           </h3>
         </div>
@@ -1128,15 +1150,17 @@ export default function ChartPreview({
         <div
           className={[
             "flex items-center gap-2 shrink-0 transition-all duration-200",
-            isEditing || isBuilder ? "" : "opacity-0 group-hover/preview:opacity-100",
+            isEditing || isBuilder
+              ? ""
+              : "opacity-0 group-hover/preview:opacity-100",
           ].join(" ")}
         >
           {onToggleFullscreen && (
             <button
               onClick={onToggleFullscreen}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-text-quaternary hover:text-text-primary hover:bg-bg-muted transition-all"
+              className="w-5 h-5 rounded-md flex items-center justify-center text-text-quaternary hover:text-text-primary hover:bg-bg-muted transition-all"
             >
-              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {isFullscreen ? <Minimize2 size={10} /> : <Maximize2 size={10} />}
             </button>
           )}
 
@@ -1262,48 +1286,48 @@ export default function ChartPreview({
 
           {/* Chart / Table toggle */}
           {chartType !== "kpi" && config?.chart_type !== "pivot_table" && (
-              <div className="flex items-center bg-bg-muted border border-border-default rounded-lg p-0.5 gap-0.5">
-                <button
-                  onClick={() =>
-                    onConfigChange?.({ ...config, view_mode: "chart" })
-                  }
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
-                    chartType !== "table"
-                      ? "bg-accent text-white"
-                      : "text-text-quaternary hover:text-text-primary"
-                  }`}
-                >
-                  <BarChart3 size={12} /> Chart
-                </button>
-                <button
-                  onClick={() =>
-                    onConfigChange?.({ ...config, view_mode: "table" })
-                  }
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
-                    chartType === "table"
-                      ? "bg-accent text-white"
-                      : "text-text-quaternary hover:text-text-primary"
-                  }`}
-                >
-                  <Table2 size={12} /> Table
-                </button>
-              </div>
-            )}
+            <div className="flex items-center bg-bg-muted border border-border-default rounded-lg p-0.5 gap-0.5">
+              <button
+                onClick={() =>
+                  onConfigChange?.({ ...config, view_mode: "chart" })
+                }
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
+                  chartType !== "table"
+                    ? "bg-accent text-white"
+                    : "text-text-quaternary hover:text-text-primary"
+                }`}
+              >
+                <BarChart3 size={12} /> Chart
+              </button>
+              <button
+                onClick={() =>
+                  onConfigChange?.({ ...config, view_mode: "table" })
+                }
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
+                  chartType === "table"
+                    ? "bg-accent text-white"
+                    : "text-text-quaternary hover:text-text-primary"
+                }`}
+              >
+                <Table2 size={12} /> Table
+              </button>
+            </div>
+          )}
 
           {/* Edit / Remove */}
           {isEditing && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               <button
                 onClick={onEdit}
-                className="w-7 h-7 rounded-lg border border-border-default flex items-center justify-center text-text-quaternary hover:text-emerald hover:bg-emerald-muted transition-all"
+                className="w-5 h-5 rounded-md border border-border-default flex items-center justify-center text-text-quaternary hover:text-emerald hover:bg-emerald-muted transition-all"
               >
-                <Edit3 size={13} />
+                <Edit3 size={10} />
               </button>
               <button
                 onClick={onRemove}
-                className="w-7 h-7 rounded-lg border border-border-default flex items-center justify-center text-text-quaternary hover:text-rose hover:bg-rose-muted transition-all"
+                className="w-5 h-5 rounded-md border border-border-default flex items-center justify-center text-text-quaternary hover:text-rose hover:bg-rose-muted transition-all"
               >
-                <X size={13} />
+                <X size={10} />
               </button>
             </div>
           )}
