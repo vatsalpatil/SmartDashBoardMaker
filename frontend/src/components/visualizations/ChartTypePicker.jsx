@@ -2,14 +2,14 @@ import { useState, useMemo } from 'react';
 import {
   BarChart3, LineChart, PieChart, TrendingUp, Table2, Hash,
   ScatterChart, Layers, Activity, Search, Star, Clock,
-  ChevronDown, ChevronRight, Check
+  ChevronDown, ChevronRight, Check, Globe,
 } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { CHART_CATALOG, PRESET_MAP } from '../../lib/chartPresets';
 
 const ICON_MAP = {
   LineChart, TrendingUp, BarChart3, PieChart,
-  ScatterChart, Layers, Activity, Table2, Hash,
+  ScatterChart, Layers, Activity, Table2, Hash, Globe,
 };
 
 export default function ChartTypePicker({ config, onConfigChange }) {

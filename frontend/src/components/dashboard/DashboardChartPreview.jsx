@@ -26,6 +26,8 @@ import {
   RadialBarChart,
   RadialBar,
   ReferenceLine,
+  Brush,
+  Treemap,
 } from "recharts";
 import {
   Activity,
@@ -82,10 +84,62 @@ const tooltipStyle = {
 const formatValue = (value) => {
   if (typeof value !== "number") return value;
   const absVal = Math.abs(value);
-  if (absVal >= 10000000) return (value / 10000000).toFixed(1) + " Cr";
-  if (absVal >= 100000) return (value / 100000).toFixed(1) + " L";
-  if (absVal >= 1000) return (value / 1000).toFixed(1) + " k";
+  if (absVal >= 10000000)
+    return (
+      (value / 10000000).toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }) + " Cr"
+    );
+  if (absVal >= 100000)
+    return (
+      (value / 100000).toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }) + " L"
+    );
+  if (absVal >= 1000)
+    return (
+      (value / 1000).toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }) + " k"
+    );
   return value.toLocaleString();
+};
+
+const formatTooltipValue = (value) => {
+  if (typeof value !== "number") return value;
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+};
+
+const ChartCrosshair = (props) => {
+  const { x, y, width, height } = props;
+  if (x === undefined || y === undefined) return null;
+  return (
+    <g>
+      <line
+        x1={x}
+        y1={0}
+        x2={x}
+        y2={height}
+        stroke="#3b82f6"
+        strokeWidth={2}
+        strokeDasharray="6 6"
+      />
+      <line
+        x1={0}
+        y1={y}
+        x2={width}
+        y2={y}
+        stroke="#3b82f6"
+        strokeWidth={1}
+        strokeDasharray="3 3"
+        opacity={0.6}
+      />
+      <circle cx={x} cy={y} r={4} fill="#3b82f6" />
+    </g>
+  );
 };
 
 export default function DashboardChartPreview({
@@ -100,18 +154,6 @@ export default function DashboardChartPreview({
   isBuilder = false,
 }) {
   const [aggMode, setAggMode] = useState(config.agg_mode || "sum");
-
-  // 1. Validation Logic
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-white/20 animate-in fade-in duration-700">
-        <Activity size={40} strokeWidth={1} className="animate-pulse" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.3em]">
-          Neural Interface Ready // Awaiting Pipeline
-        </span>
-      </div>
-    );
-  }
 
   // 2. Data Resolution Helper
   const getFieldVal = (row, field) => {
@@ -146,31 +188,38 @@ export default function DashboardChartPreview({
       : config?.chart_type || "bar";
   const isValidField = (f) => f && getFieldVal(data[0], f) !== undefined;
 
-  let _xFields = config?.x_fields?.length > 0
-    ? config.x_fields
-    : [config?.x_field].filter(Boolean);
+  let _xFields =
+    config?.x_fields?.length > 0
+      ? config.x_fields
+      : [config?.x_field].filter(Boolean);
   _xFields = _xFields.filter(isValidField);
 
   if (_xFields.length === 0 && !isAutomaticKPI && data[0]) {
     const cols = Object.keys(data[0]);
-    const firstStr = cols.find(c => typeof data[0][c] === 'string');
+    const firstStr = cols.find((c) => typeof data[0][c] === "string");
     _xFields = [firstStr || cols[0]].filter(Boolean);
   }
 
   const xFieldsArray = isAutomaticKPI ? [] : _xFields;
   const xField = xFieldsArray[0];
 
-  let _yFields = config?.y_fields?.length > 0
-    ? config.y_fields
-    : config?.y_field
-      ? [config.y_field]
-      : [];
+  let _yFields =
+    config?.y_fields?.length > 0
+      ? config.y_fields
+      : config?.y_field
+        ? [config.y_field]
+        : [];
   _yFields = _yFields.filter(isValidField);
 
   if (_yFields.length === 0 && !isAutomaticKPI && data[0]) {
     const cols = Object.keys(data[0]);
-    const numCols = cols.filter(c => typeof data[0][c] === 'number' && !_xFields.includes(c));
-    _yFields = numCols.length > 0 ? [numCols[0]] : [cols.filter(c => !_xFields.includes(c))[0]].filter(Boolean);
+    const numCols = cols.filter(
+      (c) => typeof data[0][c] === "number" && !_xFields.includes(c),
+    );
+    _yFields =
+      numCols.length > 0
+        ? [numCols[0]]
+        : [cols.filter((c) => !_xFields.includes(c))[0]].filter(Boolean);
   }
 
   const yFields = isAutomaticKPI ? [autoKpiField] : _yFields;
@@ -191,6 +240,51 @@ export default function DashboardChartPreview({
     });
     return newRow;
   });
+
+  const trendData = useMemo(() => {
+    if (
+      !config.show_trend_line ||
+      (yFields.length === 0 && config.chart_type !== "candlestick") ||
+      resolvedData.length < 2
+    )
+      return null;
+    const field =
+      config.chart_type === "candlestick"
+        ? config.candle_close || yFields[0]
+        : yFields[0];
+    const n = resolvedData.length;
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumX2 = 0;
+    resolvedData.forEach((d, i) => {
+      const v = Number(d[field]) || 0;
+      sumX += i;
+      sumY += v;
+      sumXY += i * v;
+      sumX2 += i * i;
+    });
+    const denominator = n * sumX2 - sumX * sumX;
+    if (denominator === 0) return null;
+    const slope = (n * sumXY - sumX * sumY) / denominator;
+    const intercept = (sumY - slope * sumX) / n;
+    return resolvedData.map((d, i) => ({
+      ...d,
+      _trend: slope * i + intercept,
+    }));
+  }, [config.show_trend_line, yFields, resolvedData]);
+
+  // 1. Validation Logic
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-white/20 animate-in fade-in duration-700">
+        <Activity size={40} strokeWidth={1} className="animate-pulse" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.3em]">
+          Neural Interface Ready // Awaiting Pipeline
+        </span>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     if (yFields.length === 0) {
@@ -681,24 +775,73 @@ export default function DashboardChartPreview({
     yFields.forEach((f, i) => {
       chartConfig[f] = {
         label: f,
-        color: palette[i % palette.length],
+        color: config.series_colors?.[f] || palette[i % palette.length],
       };
     });
 
     // ── Gradient defs for area/gradient fill ──
-    const gradientDefs = (config.gradient_fill || chartType === "stacked_area" || chartType === "percent_area") ? (
-      <defs>
-        {yFields.map((f, i) => (
-          <linearGradient key={f} id={`grad_${f}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={palette[i % palette.length]} stopOpacity={0.35} />
-            <stop offset="95%" stopColor={palette[i % palette.length]} stopOpacity={0.03} />
-          </linearGradient>
-        ))}
-      </defs>
-    ) : null;
+    const gradientDefs =
+      config.gradient_fill ||
+      chartType === "stacked_area" ||
+      chartType === "percent_area" ? (
+        <defs>
+          {yFields.map((f, i) => {
+            const color =
+              config.series_colors?.[f] || palette[i % palette.length];
+            return (
+              <linearGradient
+                key={f}
+                id={`grad_${f}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="5%" stopColor={color} stopOpacity={0.35} />
+                <stop offset="95%" stopColor={color} stopOpacity={0.03} />
+              </linearGradient>
+            );
+          })}
+        </defs>
+      ) : null;
 
     // ── curve type: monotone (default) | linear | step ──
-    const curveType = config.curve_type === "linear" ? "linear" : config.curve_type === "step" ? "step" : "monotone";
+    const curveType =
+      config.curve_type === "linear"
+        ? "linear"
+        : config.curve_type === "step"
+          ? "step"
+          : "monotone";
+
+    // ── Universal Axis Helper ──
+    const getAxisProps = (prefix) => {
+      const mode = config[`${prefix}_mode`] || "smart";
+      const type = config[`${prefix}_type`] || "linear";
+      const minV = config[`${prefix}_min`];
+      const maxV = config[`${prefix}_max`];
+
+      let domain = ["auto", "auto"];
+      const isPercent =
+        chartType === "stacked_percent_bar" ||
+        chartType === "percent_area" ||
+        config.stacking === "percent";
+
+      if (isPercent) {
+        domain = [0, 100];
+      } else if (mode === "zero") {
+        domain = [0, (max) => Math.max(max * 1.1, max + 1)];
+      } else if (mode === "manual") {
+        domain = [minV ?? "auto", maxV ?? "auto"];
+      } else {
+        // Smart mode: add padding to prevent jumping
+        domain = [
+          (min) => (min < 0 ? min * 1.1 : min * 0.95),
+          (max) => (max < 0 ? max * 0.95 : max * 1.1),
+        ];
+      }
+
+      return { domain, scale: type };
+    };
 
     // ── Pie / Donut / Rose / Nested-Donut ──
     if (
@@ -711,6 +854,10 @@ export default function DashboardChartPreview({
       if (chartType === "nested_donut") {
         const rings = yFields.slice(0, 4);
         const totalR = 85;
+        const coloredData = resolvedData.map((d, i) => ({
+          ...d,
+          fill: palette[i % palette.length],
+        }));
         const step = Math.floor((totalR - 20) / Math.max(rings.length, 1));
         return (
           <ChartContainer config={chartConfig} className="h-full w-full">
@@ -721,7 +868,7 @@ export default function DashboardChartPreview({
                 return (
                   <Pie
                     key={f}
-                    data={resolvedData}
+                    data={coloredData}
                     dataKey={f}
                     nameKey={xField}
                     cx="50%"
@@ -732,14 +879,29 @@ export default function DashboardChartPreview({
                     stroke="none"
                   >
                     {resolvedData.map((_, idx) => (
-                      <Cell key={idx} fill={palette[(idx + ri * 3) % palette.length]} fillOpacity={0.85} />
+                      <Cell
+                        key={idx}
+                        fill={palette[(idx + ri * 3) % palette.length]}
+                        fillOpacity={0.85}
+                      />
                     ))}
                   </Pie>
                 );
               })}
-              <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} />
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    formatter={(v) => formatTooltipValue(v)}
+                  />
+                }
+              />
               {config.legend_position !== "hidden" && (
-                <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
+                <ChartLegend
+                  content={<ChartLegendContent nameKey={xField} />}
+                  verticalAlign="bottom"
+                  height={20}
+                />
               )}
             </RePieChart>
           </ChartContainer>
@@ -747,17 +909,38 @@ export default function DashboardChartPreview({
       }
 
       // Active-sector donut: highlight hovered slice
-      const isDonut = chartType === "donut";
+      const isDonut =
+        chartType === "donut" || (config.pie_inner_radius ?? 0) > 0;
       const isRose = chartType === "rose";
       const showInnerText = config.inner_text && isDonut;
-      const innerR = isDonut ? "60%" : isRose ? "20%" : 0;
-      const outerR = "83%";
+      const innerR =
+        config.pie_inner_radius != null
+          ? `${config.pie_inner_radius}%`
+          : isDonut
+            ? "60%"
+            : isRose
+              ? "20%"
+              : 0;
+      const outerR =
+        config.pie_outer_radius != null ? `${config.pie_outer_radius}%` : "83%";
 
       return (
         <ChartContainer config={chartConfig} className="h-full w-full">
           <RePieChart>
             <Pie
-              data={resolvedData}
+              data={resolvedData.map((d, i) => {
+                const name = String(d[xField] || "");
+                const val = Number(d[yFields[0]]) || 0;
+                let label = name;
+                if (config.label_type === "value") label = formatValue(val);
+                else if (config.label_type === "both")
+                  label = `${name}: ${formatValue(val)}`;
+                return {
+                  ...d,
+                  fill: palette[i % palette.length],
+                  __label: label,
+                };
+              })}
               dataKey={yFields[0]}
               nameKey={xField}
               cx="50%"
@@ -782,16 +965,23 @@ export default function DashboardChartPreview({
               ))}
               {config.show_data_labels && (
                 <LabelList
-                  dataKey={xField}
-                  position="outside"
-                  style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 600 }}
+                  dataKey="__label"
+                  position={config.label_position || "outside"}
+                  style={{
+                    fontSize: 10,
+                    fill: "var(--color-text-tertiary)",
+                    fontWeight: 600,
+                  }}
                 />
               )}
               {showInnerText && (
                 <Label
                   content={({ viewBox }) => {
                     if (viewBox && viewBox.cx && viewBox.cy) {
-                      const totalVal = resolvedData.reduce((acc, r) => acc + (Number(r[yFields[0]]) || 0), 0);
+                      const totalVal = resolvedData.reduce(
+                        (acc, r) => acc + (Number(r[yFields[0]]) || 0),
+                        0,
+                      );
                       return (
                         <text
                           x={viewBox.cx}
@@ -820,9 +1010,18 @@ export default function DashboardChartPreview({
                 />
               )}
             </Pie>
-            <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent formatter={(v) => formatTooltipValue(v)} />
+              }
+            />
             {config.legend_position !== "hidden" && (
-              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
+              <ChartLegend
+                content={<ChartLegendContent nameKey={xField} />}
+                verticalAlign="bottom"
+                height={20}
+              />
             )}
           </RePieChart>
         </ChartContainer>
@@ -831,16 +1030,30 @@ export default function DashboardChartPreview({
 
     // ── Radar ──
     if (chartType === "radar") {
-      const fillOp = config.fill_opacity !== undefined ? config.fill_opacity : 0.2;
+      const isFilled = config.radar_filled !== false;
+      const fillOp = isFilled
+        ? config.fill_opacity !== undefined
+          ? config.fill_opacity
+          : 0.2
+        : 0;
       return (
         <ChartContainer config={chartConfig} className="h-full w-full">
           <RadarChart cx="50%" cy="50%" outerRadius="80%" data={resolvedData}>
             <PolarGrid stroke="var(--color-border-muted)" strokeOpacity={0.2} />
             <PolarAngleAxis
               dataKey={xField}
-              tick={{ fill: "var(--color-text-tertiary)", fontSize: 8, fontWeight: "600" }}
+              tick={{
+                fill: "var(--color-text-tertiary)",
+                fontSize: 10,
+                fontWeight: "600",
+              }}
             />
-            <PolarRadiusAxis angle={30} domain={[0, "auto"]} tick={false} axisLine={false} />
+            <PolarRadiusAxis
+              angle={30}
+              domain={[0, "auto"]}
+              tick={false}
+              axisLine={false}
+            />
             {yFields.map((f, i) => (
               <Radar
                 key={f}
@@ -849,15 +1062,42 @@ export default function DashboardChartPreview({
                 stroke={palette[i % palette.length]}
                 fill={palette[i % palette.length]}
                 fillOpacity={fillOp}
-                dot={config.show_markers ? { r: 3, fill: palette[i % palette.length] } : false}
-              />
+                dot={
+                  config.show_markers
+                    ? { r: 3, fill: palette[i % palette.length] }
+                    : false
+                }
+              >
+                {config.show_data_labels && (
+                  <LabelList
+                    dataKey={f}
+                    position="top"
+                    style={{
+                      fontSize: 10,
+                      fill: "var(--color-text-tertiary)",
+                      fontWeight: 700,
+                    }}
+                    formatter={formatValue}
+                  />
+                )}
+              </Radar>
             ))}
             <ChartTooltip
-              cursor={{ stroke: "var(--color-accent)", strokeWidth: 1, strokeDasharray: "4 4" }}
-              content={<ChartTooltipContent formatter={(v) => formatValue(v)} />}
+              cursor={{
+                stroke: "var(--color-accent)",
+                strokeWidth: 1,
+                strokeDasharray: "4 4",
+              }}
+              content={
+                <ChartTooltipContent formatter={(v) => formatTooltipValue(v)} />
+              }
             />
             {config.legend_position !== "hidden" && (
-              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
+              <ChartLegend
+                content={<ChartLegendContent />}
+                verticalAlign="bottom"
+                height={20}
+              />
             )}
           </RadarChart>
         </ChartContainer>
@@ -868,68 +1108,680 @@ export default function DashboardChartPreview({
     if (chartType === "radial_bar") {
       return (
         <ChartContainer config={chartConfig} className="h-full w-full">
-          <RadialBarChart cx="50%" cy="50%" innerRadius="10%" outerRadius="80%" barSize={7} data={resolvedData}>
+          <RadialBarChart
+            cx="50%"
+            cy="50%"
+            innerRadius="10%"
+            outerRadius="80%"
+            barSize={7}
+            data={resolvedData.map((d, i) => ({
+              ...d,
+              fill: palette[i % palette.length],
+            }))}
+          >
             <RadialBar
               minAngle={15}
-              label={config.show_data_labels ? { position: "insideStart", fill: "#fff", fontSize: 8 } : false}
+              label={
+                config.show_data_labels
+                  ? { position: "insideStart", fill: "#fff", fontSize: 8 }
+                  : false
+              }
               background
               clockWise
               dataKey={yFields[0]}
+              nameKey={xField}
               isAnimationActive={false}
             >
               {resolvedData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={palette[index % palette.length]}
+                />
               ))}
             </RadialBar>
-            <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(v) => formatValue(v)} />} />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent formatter={(v) => formatTooltipValue(v)} />
+              }
+            />
             {config.legend_position !== "hidden" && (
-              <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" height={20} />
+              <ChartLegend
+                content={<ChartLegendContent nameKey={xField} />}
+                verticalAlign="bottom"
+                height={20}
+              />
             )}
           </RadialBarChart>
         </ChartContainer>
       );
     }
 
+    // ── Scatter / Bubble ──
+    if (chartType === "scatter" || chartType === "bubble") {
+      const xF = yFields[0];
+      const yF = yFields[1] || yFields[0];
+      const zF = config.size_field;
+      const dotR = config.dot_size ?? 5;
+      const scatterData = resolvedData.map((row) => ({
+        x: Number(getFieldVal(row, xF)) || 0,
+        y: Number(getFieldVal(row, yF)) || 0,
+        z: zF ? Number(getFieldVal(row, zF)) || 1 : 1,
+        name: xField ? getFieldVal(row, xField) : "",
+      }));
+      return (
+        <ChartContainer
+          config={{
+            x: { label: xF, color: palette[0] },
+            y: { label: yF, color: palette[1] },
+          }}
+          className="h-full w-full"
+        >
+          <ScatterChart margin={{ top: 10, right: 16, bottom: 10, left: 0 }}>
+            {(config.show_grid !== false || config.show_grid_x) && (
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#ffffff"
+                strokeOpacity={0.15}
+                horizontal={config.show_grid !== false}
+                vertical={!!config.show_grid_x}
+              />
+            )}
+            <XAxis
+              type="number"
+              dataKey="x"
+              name={xF}
+              tick={{
+                fill: "var(--color-text-tertiary)",
+                fontSize: 12,
+                fontWeight: "bold",
+              }}
+              tickFormatter={formatValue}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              type="number"
+              dataKey="y"
+              name={yF}
+              tick={{
+                fill: "var(--color-text-tertiary)",
+                fontSize: 12,
+                fontWeight: "bold",
+              }}
+              tickFormatter={formatValue}
+              axisLine={false}
+              tickLine={false}
+              width={65}
+              tickMargin={8}
+              tickCount={8}
+            />
+            {chartType === "bubble" && (
+              <ZAxis type="number" dataKey="z" range={[30, 400]} />
+            )}
+            <ChartTooltip
+              cursor={{
+                stroke: "var(--color-accent)",
+                strokeWidth: 1,
+                strokeDasharray: "4 4",
+              }}
+              content={
+                <ChartTooltipContent formatter={(v) => formatTooltipValue(v)} />
+              }
+            />
+            <Scatter
+              name="data"
+              data={scatterData}
+              fill={palette[0]}
+              fillOpacity={0.75}
+              r={chartType === "bubble" ? undefined : dotR}
+              isAnimationActive={config.animation_enabled !== false}
+            />
+          </ScatterChart>
+        </ChartContainer>
+      );
+    }
+
+    // ── Funnel (custom SVG) ──
+    if (chartType === "funnel") {
+      const maxVal = Math.max(
+        ...resolvedData.map((r) => Number(getFieldVal(r, yFields[0])) || 0),
+        1,
+      );
+      const showPct = config.funnel_show_pct || false;
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-1 px-4">
+          {resolvedData.map((row, i) => {
+            const val = Number(getFieldVal(row, yFields[0])) || 0;
+            const label = xField
+              ? String(getFieldVal(row, xField) ?? "")
+              : String(i + 1);
+            const pct = ((val / maxVal) * 100).toFixed(0);
+            const barW = `${Math.max(20, (val / maxVal) * 100)}%`;
+            const color = palette[i % palette.length];
+            const prevVal =
+              i > 0
+                ? Number(getFieldVal(resolvedData[i - 1], yFields[0])) || val
+                : val;
+            const convPct = i > 0 ? ((val / prevVal) * 100).toFixed(0) : 100;
+            return (
+              <div
+                key={i}
+                className="flex flex-col items-center w-full gap-0.5"
+              >
+                {showPct && i > 0 && (
+                  <span className="text-[9px] font-bold text-text-quaternary">
+                    ↓ {convPct}%
+                  </span>
+                )}
+                <div className="flex items-center w-full gap-2">
+                  <span
+                    className="text-[10px] font-bold text-text-tertiary text-right shrink-0"
+                    style={{ width: 120, minWidth: 120 }}
+                  >
+                    {label}
+                  </span>
+                  <div
+                    className="flex-1 flex items-center justify-center"
+                    style={{ height: 28 }}
+                  >
+                    <div
+                      style={{
+                        width: barW,
+                        height: "100%",
+                        background: color,
+                        borderRadius: 4,
+                        opacity: 0.85,
+                        transition: "width 0.4s ease",
+                      }}
+                      className="flex items-center justify-center"
+                    >
+                      {config.show_data_labels !== false && (
+                        <span className="text-[10px] font-black text-white">
+                          {formatValue(val)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {showPct && (
+                    <span
+                      className="text-[9px] font-bold text-text-quaternary shrink-0"
+                      style={{ width: 36 }}
+                    >
+                      {pct}%
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Waterfall (custom bar logic) ──
+    if (chartType === "waterfall") {
+      const posColor = config.conditional_positive || "#22c55e";
+      const negColor = config.conditional_negative || "#ef4444";
+      const totalColor = config.waterfall_total_color || palette[0];
+
+      let running = 0;
+      const wfData = resolvedData.map((row, i) => {
+        const val = Number(getFieldVal(row, yFields[0])) || 0;
+        const isLast = i === resolvedData.length - 1;
+        const start = isLast ? 0 : running;
+        running += val;
+        return {
+          label: xField ? String(getFieldVal(row, xField) ?? i) : String(i),
+          value: val,
+          start: isLast ? 0 : start,
+          end: isLast ? running : running,
+          isTotal: isLast,
+          color: isLast ? totalColor : val >= 0 ? posColor : negColor,
+        };
+      });
+
+      const allVals = wfData.map((d) => [d.start, d.end]).flat();
+      const minV = Math.min(0, ...allVals);
+      const maxV = Math.max(...allVals);
+      const range = maxV - minV || 1;
+      const H = 180;
+
+      return (
+        <div className="flex flex-col items-end justify-end w-full h-full px-4 pb-4 pt-4">
+          <div className="flex items-end gap-1.5 w-full h-full">
+            {wfData.map((d, i) => {
+              const barH = (Math.abs(d.end - d.start) / range) * H;
+              const offsetFromBottom =
+                ((Math.min(d.start, d.end) - minV) / range) * H;
+              return (
+                <div
+                  key={i}
+                  className="flex flex-col items-center gap-1 flex-1"
+                >
+                  {config.show_data_labels !== false && (
+                    <span
+                      className="text-[9px] font-black"
+                      style={{ color: d.color }}
+                    >
+                      {formatValue(d.value)}
+                    </span>
+                  )}
+                  <div
+                    className="relative w-full flex flex-col justify-end"
+                    style={{ height: H }}
+                  >
+                    <div
+                      className="absolute w-full rounded-sm transition-all"
+                      style={{
+                        height: Math.max(2, barH),
+                        bottom: offsetFromBottom,
+                        background: d.color,
+                        opacity: 0.85,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[8px] font-bold text-text-quaternary text-center truncate w-full">
+                    {d.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Histogram (computed bins) ──
+    if (chartType === "histogram") {
+      const numBins = config.histogram_bins ?? 20;
+      const rawVals = resolvedData
+        .map((r) => Number(getFieldVal(r, yFields[0])))
+        .filter((v) => !isNaN(v));
+      if (rawVals.length === 0) return null;
+      const minV2 = Math.min(...rawVals);
+      const maxV2 = Math.max(...rawVals);
+      const binSize = (maxV2 - minV2) / numBins || 1;
+      const bins = Array.from({ length: numBins }, (_, i) => ({
+        name: `${(minV2 + i * binSize).toFixed(1)}`,
+        count: rawVals.filter(
+          (v) => v >= minV2 + i * binSize && v < minV2 + (i + 1) * binSize,
+        ).length,
+      }));
+      return (
+        <ChartContainer
+          config={{ count: { label: "Count", color: palette[0] } }}
+          className="h-full w-full"
+        >
+          <ComposedChart
+            data={bins}
+            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+          >
+            {(config.show_grid !== false || config.show_grid_x) && (
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#ffffff"
+                strokeOpacity={0.15}
+                horizontal={config.show_grid !== false}
+                vertical={!!config.show_grid_x}
+              />
+            )}
+            <XAxis
+              dataKey="name"
+              tick={{ fill: "var(--color-text-tertiary)", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              yAxisId="left"
+              tick={{
+                fill: "var(--color-text-tertiary)",
+                fontSize: 12,
+                fontWeight: "bold",
+              }}
+              axisLine={false}
+              tickLine={false}
+              width={65}
+              tickMargin={8}
+              tickCount={8}
+            />
+            <ChartTooltip
+              cursor={{
+                stroke: "var(--color-accent)",
+                strokeWidth: 1,
+                strokeDasharray: "4 4",
+              }}
+              content={<ChartTooltipContent />}
+            />
+            <Bar
+              yAxisId="left"
+              dataKey="count"
+              radius={[2, 2, 0, 0]}
+              isAnimationActive={config.animation_enabled !== false}
+            >
+              {bins.map((_, i) => (
+                <Cell key={i} fill={palette[0]} fillOpacity={0.8} />
+              ))}
+            </Bar>
+          </ComposedChart>
+        </ChartContainer>
+      );
+    }
+
+    // ── Candlestick ──
+    if (chartType === "candlestick") {
+      const openField = config.candle_open || yFields[0];
+      const highField = config.candle_high || yFields[1];
+      const lowField = config.candle_low || yFields[2];
+      const closeField = config.candle_close || yFields[3];
+
+      if (!openField || !highField || !lowField || !closeField) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-text-quaternary text-[9px] text-center px-4">
+            <Activity size={18} className="mb-2 opacity-50" />
+            OHLC mapping required
+          </div>
+        );
+      }
+
+      const upColor = config.candle_up || "#22c55e";
+      const downColor = config.candle_down || "#ef4444";
+      const wickW = config.candle_wick_width ?? 1;
+      const bodyW = config.candle_body_width ?? 6;
+
+      const candleData = (trendData || resolvedData).map((row) => {
+        const o = Number(getFieldVal(row, openField)) || 0;
+        const h = Number(getFieldVal(row, highField)) || 0;
+        const l = Number(getFieldVal(row, lowField)) || 0;
+        const c = Number(getFieldVal(row, closeField)) || 0;
+        return {
+          ...row,
+          _wick: [l, h],
+          _body: [Math.min(o, c), Math.max(o, c)],
+          _isUp: c >= o,
+          _open: o,
+          _close: c,
+          _high: h,
+          _low: l,
+        };
+      });
+
+      const primaryAxis = getAxisProps("axis_y");
+
+      return (
+        <ChartContainer config={chartConfig} className="h-full w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={candleData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="var(--color-border-muted)"
+                strokeOpacity={0.1}
+                vertical={false}
+              />
+              <XAxis
+                xAxisId={0}
+                dataKey={xField}
+                tick={{
+                  fill: "var(--color-text-tertiary)",
+                  fontSize: 9,
+                  fontWeight: "bold",
+                }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => String(v).slice(0, 8)}
+              />
+              <XAxis xAxisId={1} dataKey={xField} hide={true} />
+              <YAxis
+                yAxisId="left"
+                domain={primaryAxis.domain}
+                scale={primaryAxis.scale}
+                tick={{
+                  fill: "var(--color-text-tertiary)",
+                  fontSize: 9,
+                  fontWeight: "bold",
+                }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={formatValue}
+                tickCount={5}
+                width={60}
+              />
+              <ChartTooltip
+                cursor={{ fill: "var(--color-bg-muted)", opacity: 0.3 }}
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const d = payload[0].payload;
+                    return (
+                      <div className="glass px-2 py-1.5 rounded-lg border border-white/10 shadow-xl text-[9px]">
+                        <p className="font-black text-text-quaternary uppercase mb-1 truncate max-w-[100px]">
+                          {String(getFieldVal(d, xField))}
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-2">
+                          <span className="text-text-tertiary font-bold uppercase">
+                            O:
+                          </span>
+                          <span className="text-white font-black text-right">
+                            {formatTooltipValue(d._open)}
+                          </span>
+                          <span className="text-text-tertiary font-bold uppercase">
+                            C:
+                          </span>
+                          <span
+                            className="font-black text-right"
+                            style={{ color: d._isUp ? upColor : downColor }}
+                          >
+                            {formatTooltipValue(d._close)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar
+                xAxisId={0}
+                yAxisId="left"
+                dataKey="_wick"
+                barSize={wickW}
+                isAnimationActive={false}
+              >
+                {candleData.map((d, i) => (
+                  <Cell key={i} fill={d._isUp ? upColor : downColor} />
+                ))}
+              </Bar>
+              <Bar
+                xAxisId={1}
+                yAxisId="left"
+                dataKey="_body"
+                barSize={bodyW}
+                isAnimationActive={false}
+              >
+                {candleData.map((d, i) => (
+                  <Cell key={i} fill={d._isUp ? upColor : downColor} />
+                ))}
+              </Bar>
+              {config.show_trend_line && (
+                <Line
+                  xAxisId={0}
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="_trend"
+                  stroke="var(--color-accent)"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={false}
+                  activeDot={false}
+                  name="Trend Line"
+                  isAnimationActive={false}
+                />
+              )}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </ChartContainer>
+      );
+    }
+
+    // ── Treemap ──
+    if (chartType === "treemap") {
+      const valF = yFields[0];
+      if (!valF) {
+        return (
+          <div className="flex items-center justify-center h-full text-text-quaternary text-[11px]">
+            Treemap requires a value (Y-Axis).
+          </div>
+        );
+      }
+
+      const treeData = resolvedData.map((d) => ({
+        name: String(getFieldVal(d, xField) ?? "Unknown"),
+        size: Number(getFieldVal(d, valF)) || 0,
+      }));
+
+      const CustomTooltip = ({ active, payload }) => {
+        if (active && payload && payload.length) {
+          return (
+            <div
+              className="px-3 py-2 rounded-lg"
+              style={{
+                background: "rgba(10, 10, 20, 0.9)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                backdropFilter: "blur(20px)",
+                color: "#fff",
+              }}
+            >
+              <div className="text-[10px] font-bold text-text-quaternary uppercase mb-1">
+                {payload[0].payload.name}
+              </div>
+              <div
+                className="text-[12px] font-black"
+                style={{ color: palette[0] }}
+              >
+                {formatTooltipValue(payload[0].value)}
+              </div>
+            </div>
+          );
+        }
+        return null;
+      };
+
+      return (
+        <ChartContainer config={chartConfig} className="h-full w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <Treemap
+              data={treeData}
+              dataKey="size"
+              aspectRatio={4 / 3}
+              content={(props) => {
+                const { x, y, width, height, index, name } = props;
+                return (
+                  <g>
+                    <rect
+                      x={x}
+                      y={y}
+                      width={width}
+                      height={height}
+                      fill={palette[index % palette.length]}
+                      stroke="var(--color-bg-base)"
+                      strokeWidth={2}
+                    />
+                    {width > 40 && height > 20 && (
+                      <text
+                        x={x + width / 2}
+                        y={y + height / 2}
+                        textAnchor="middle"
+                        fill="#fff"
+                        fontSize={11}
+                        fontWeight="bold"
+                        dy={4}
+                      >
+                        {name}
+                      </text>
+                    )}
+                  </g>
+                );
+              }}
+            >
+              <Tooltip content={<CustomTooltip />} />
+            </Treemap>
+          </ResponsiveContainer>
+        </ChartContainer>
+      );
+    }
+
     // ── All Composed / Bar / Line / Area variants ──
-    const isHorizontal = chartType === "horizontal_bar";
-    const isStackedBar  = chartType === "stacked_bar";
-    const isPercentBar  = chartType === "stacked_percent_bar";
-    const isStackedArea = chartType === "stacked_area";
-    const isPercentArea = chartType === "percent_area";
-    const isAnyStacked  = isStackedBar || isPercentBar || isStackedArea || isPercentArea;
+    const isHorizontal = config.orientation === "horizontal";
+    const isStackedBar = chartType === "bar" && config.stacking === "stacked";
+    const isPercentBar = chartType === "bar" && config.stacking === "percent";
+    const isStackedArea = chartType === "area" && config.stacking === "stacked";
+    const isPercentArea = chartType === "area" && config.stacking === "percent";
+    const isAnyStacked =
+      isStackedBar || isPercentBar || isStackedArea || isPercentArea;
 
     // For percent stacking, compute per-row totals
-    const percentTotals = (isPercentBar || isPercentArea)
-      ? resolvedData.map(row => yFields.reduce((s, f) => s + (Number(row[f]) || 0), 0))
-      : null;
+    const percentTotals =
+      isPercentBar || isPercentArea
+        ? resolvedData.map((row) =>
+            yFields.reduce((s, f) => s + (Number(row[f]) || 0), 0),
+          )
+        : null;
 
-    const stackedResolvedData = (isPercentBar || isPercentArea)
-      ? resolvedData.map((row, ri) => {
-          const total = percentTotals[ri] || 1;
-          const newRow = { ...row };
-          yFields.forEach(f => { newRow[f] = ((Number(row[f]) || 0) / total) * 100; });
-          return newRow;
-        })
-      : resolvedData;
+    const stackedResolvedData =
+      isPercentBar || isPercentArea
+        ? resolvedData.map((row, ri) => {
+            const total = percentTotals[ri] || 1;
+            const newRow = { ...row };
+            yFields.forEach((f) => {
+              newRow[f] = ((Number(row[f]) || 0) / total) * 100;
+            });
+            return newRow;
+          })
+        : resolvedData;
+
+    const primaryAxis = getAxisProps("axis_y");
+    const secondaryAxis = getAxisProps("axis_y_secondary");
+
+    const finalData = trendData || stackedResolvedData;
 
     return (
       <ChartContainer config={chartConfig} className="h-full w-full">
         <ComposedChart
-          data={stackedResolvedData}
+          data={finalData}
           layout={isHorizontal ? "vertical" : "horizontal"}
-          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          margin={{
+            top: 15,
+            right: 25,
+            left: 15,
+            bottom: config.axis_x_rotation
+              ? Math.abs(config.axis_x_rotation) * 0.6 + 15
+              : 5,
+          }}
         >
           {gradientDefs}
           {/* Zero reference line for negative-bar charts */}
-          {(config.conditional_color || chartType === "bar") && !isHorizontal && (
-            <ReferenceLine yAxisId="left" y={0} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+          {(config.conditional_color || chartType === "bar") &&
+            !isHorizontal && (
+              <ReferenceLine
+                yAxisId="left"
+                y={0}
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth={1}
+              />
+            )}
+          {(config.show_grid !== false || config.show_grid_x) && (
+            <CartesianGrid
+              yAxisId="left"
+              strokeDasharray="3 3"
+              stroke="#ffffff"
+              strokeOpacity={0.2}
+              horizontal={config.show_grid !== false}
+              vertical={!!config.show_grid_x}
+            />
           )}
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="var(--color-border-muted)"
-            strokeOpacity={0.2}
-            vertical={false}
-          />
           {/* ── AXES ── */}
           {isHorizontal ? (
             <>
@@ -938,15 +1790,27 @@ export default function DashboardChartPreview({
                 yAxisId="left"
                 dataKey={xField}
                 type="category"
-                width={72}
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
-                tickFormatter={(v) => String(v).length > 10 ? String(v).slice(0, 10) + "…" : String(v)}
+                width={100}
+                tick={{
+                  fill: "var(--color-text-tertiary)",
+                  fontSize: 11,
+                  fontWeight: "bold",
+                }}
+                tickFormatter={(v) =>
+                  String(v).length > 25
+                    ? String(v).slice(0, 25) + "…"
+                    : String(v)
+                }
                 axisLine={false}
                 tickLine={false}
               />
               <XAxis
                 type="number"
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
+                tick={{
+                  fill: "var(--color-text-tertiary)",
+                  fontSize: 11,
+                  fontWeight: "bold",
+                }}
                 tickFormatter={formatValue}
                 axisLine={false}
                 tickLine={false}
@@ -957,52 +1821,144 @@ export default function DashboardChartPreview({
               <XAxis
                 dataKey={xField}
                 type="category"
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
-                tickFormatter={(v) => String(v).length > 12 ? String(v).slice(0, 12) + "…" : String(v)}
+                tick={{
+                  fill: "var(--color-text-tertiary)",
+                  fontSize: 11,
+                  fontWeight: "bold",
+                  angle: config.axis_x_rotation || 0,
+                  textAnchor:
+                    config.axis_x_rotation < 0
+                      ? "end"
+                      : config.axis_x_rotation > 0
+                        ? "start"
+                        : "middle",
+                }}
+                tickFormatter={(v) =>
+                  String(v).length > 25
+                    ? String(v).slice(0, 25) + "…"
+                    : String(v)
+                }
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 yAxisId="left"
                 type="number"
-                domain={isPercentBar || isPercentArea ? [0, 100] : ["auto", "auto"]}
-                tickFormatter={isPercentBar || isPercentArea ? (v) => `${v}%` : formatValue}
-                tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
+                domain={primaryAxis.domain}
+                scale={primaryAxis.scale}
+                label={
+                  config.axis_y_label
+                    ? {
+                        value: config.axis_y_label,
+                        angle: -90,
+                        position: "insideLeft",
+                        fill: "var(--color-text-tertiary)",
+                        fontSize: 10,
+                        fontWeight: "bold",
+                      }
+                    : undefined
+                }
+                tickFormatter={
+                  isPercentBar || isPercentArea ? (v) => `${v}%` : formatValue
+                }
+                tick={{
+                  fill: "var(--color-text-tertiary)",
+                  fontSize: 11,
+                  fontWeight: "bold",
+                }}
                 axisLine={false}
                 tickLine={false}
-                width={36}
+                width={85}
+                tickMargin={10}
+                tickCount={8}
               />
               {!isAnyStacked && yFields.length > 1 && (
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fill: "var(--color-text-tertiary)", fontSize: 9, fontWeight: "bold" }}
+                  domain={secondaryAxis.domain}
+                  scale={secondaryAxis.scale}
+                  label={
+                    config.axis_y_secondary_label
+                      ? {
+                          value: config.axis_y_secondary_label,
+                          angle: 90,
+                          position: "insideRight",
+                          fill: "var(--color-text-tertiary)",
+                          fontSize: 10,
+                          fontWeight: "bold",
+                        }
+                      : undefined
+                  }
+                  tick={{
+                    fill: "var(--color-text-tertiary)",
+                    fontSize: 11,
+                    fontWeight: "bold",
+                  }}
                   tickFormatter={formatValue}
                   axisLine={false}
                   tickLine={false}
-                  width={32}
+                  width={75}
+                  tickMargin={10}
+                  tickCount={6}
                 />
               )}
             </>
           )}
           <ChartTooltip
-            cursor={{ stroke: "var(--color-accent)", strokeWidth: 1, strokeDasharray: "4 4" }}
+            shared={true}
+            cursor={
+              config.crosshair_enabled
+                ? (props) => <ChartCrosshair {...props} />
+                : false
+            }
             content={
               <ChartTooltipContent
-                formatter={(v, name) => [
-                  (isPercentBar || isPercentArea) ? `${Number(v).toFixed(1)}%` : formatValue(v),
-                  name
-                ]}
+                formatter={(v, name) => (
+                  <div className="flex justify-between items-center w-full gap-6">
+                    <span className="text-white/50 text-[9px] font-bold uppercase tracking-widest">
+                      {name}
+                    </span>
+                    <span className="text-white text-[10px] font-black">
+                      {isPercentBar || isPercentArea
+                        ? `${Number(v).toFixed(1)}%`
+                        : formatTooltipValue(v)}
+                    </span>
+                  </div>
+                )}
               />
             }
           />
+          {config.brush_enabled && (
+            <Brush
+              dataKey={xField}
+              height={20}
+              stroke="var(--color-accent)"
+              fill="var(--color-bg-muted)"
+              travellerWidth={8}
+            />
+          )}
           {config.legend_position !== "hidden" && (
-            <ChartLegend content={<ChartLegendContent />} verticalAlign="top" align="center" />
+            <ChartLegend
+              content={<ChartLegendContent />}
+              verticalAlign={
+                config.legend_position === "top"
+                  ? "top"
+                  : config.legend_position === "right"
+                    ? "middle"
+                    : "bottom"
+              }
+              align={config.legend_position === "right" ? "right" : "center"}
+              layout={
+                config.legend_position === "right" ? "vertical" : "horizontal"
+              }
+            />
           )}
 
           {/* ── SERIES ── */}
           {yFields.map((f, i) => {
-            const color = palette[i % palette.length];
+            const color =
+              config.series_colors?.[f] || palette[i % palette.length];
             // Determine per-field series type for composed charts
             let seriesType = chartType;
             if (chartType === "composed") {
@@ -1010,7 +1966,9 @@ export default function DashboardChartPreview({
               seriesType = defaults[i] || (i === 0 ? "bar" : "line");
             }
 
-            const axisId = isHorizontal ? "left" : (config.y_axis_assign?.[f] || (i === 0 ? "left" : "right"));
+            const axisId = isHorizontal
+              ? "left"
+              : config.y_axis_assign?.[f] || (i === 0 ? "left" : "right");
 
             // ── BAR variants ──
             if (
@@ -1024,10 +1982,21 @@ export default function DashboardChartPreview({
                   yAxisId={axisId}
                   key={f}
                   dataKey={f}
-                  stackId={isAnyStacked && (isStackedBar || isPercentBar) ? "stack" : undefined}
-                  radius={isAnyStacked && i === yFields.length - 1 ? [4, 4, 0, 0] : isAnyStacked ? [0, 0, 0, 0] : [4, 4, 0, 0]}
+                  fill={color}
+                  stackId={
+                    isAnyStacked && (isStackedBar || isPercentBar)
+                      ? "stack"
+                      : undefined
+                  }
+                  radius={
+                    isAnyStacked && i === yFields.length - 1
+                      ? [4, 4, 0, 0]
+                      : isAnyStacked
+                        ? [0, 0, 0, 0]
+                        : [4, 4, 0, 0]
+                  }
                   barSize={isHorizontal ? 10 : 14}
-                  isAnimationActive={false}
+                  isAnimationActive={config.animation_enabled !== false}
                   layout={isHorizontal ? "vertical" : "horizontal"}
                 >
                   {/* Conditional coloring (positive = green, negative = red) */}
@@ -1035,19 +2004,34 @@ export default function DashboardChartPreview({
                     ? resolvedData.map((row, ri) => (
                         <Cell
                           key={ri}
-                          fill={(Number(row[f]) || 0) >= 0 ? "#22c55e" : "#ef4444"}
+                          fill={
+                            (Number(row[f]) || 0) >= 0 ? "#22c55e" : "#ef4444"
+                          }
                           fillOpacity={0.85}
                         />
                       ))
                     : resolvedData.map((_, ri) => (
-                        <Cell key={ri} fill={isAnyStacked ? color : (yFields.length === 1 ? color : palette[i % palette.length])} fillOpacity={0.85} />
-                      ))
-                  }
+                        <Cell
+                          key={ri}
+                          fill={
+                            isAnyStacked
+                              ? color
+                              : yFields.length === 1
+                                ? color
+                                : color
+                          }
+                          fillOpacity={0.85}
+                        />
+                      ))}
                   {config.show_data_labels && (
                     <LabelList
                       dataKey={f}
                       position={isHorizontal ? "right" : "top"}
-                      style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
+                      style={{
+                        fontSize: 10,
+                        fill: "var(--color-text-tertiary)",
+                        fontWeight: 700,
+                      }}
                       formatter={formatValue}
                     />
                   )}
@@ -1063,20 +2047,36 @@ export default function DashboardChartPreview({
                   key={f}
                   dataKey={f}
                   stroke={color}
-                  strokeWidth={2}
-                  type={curveType}
-                  dot={config.show_markers || config.custom_dots
-                    ? { r: config.custom_dots ? 5 : 3, fill: color, stroke: "var(--color-bg-raised)", strokeWidth: 2 }
-                    : { r: 0 }
+                  strokeWidth={config.line_width ?? 2}
+                  strokeDasharray={config.stroke_dash || ""}
+                  type={
+                    config.curve_type === "basis"
+                      ? "natural"
+                      : config.curve_type || "monotone"
                   }
-                  activeDot={{ r: 5 }}
-                  isAnimationActive={false}
+                  connectNulls={config.connect_nulls !== false}
+                  dot={
+                    config.show_markers || config.custom_dots
+                      ? {
+                          r: config.custom_dots ? 5 : (config.marker_size ?? 4),
+                          fill: color,
+                          stroke: color,
+                          strokeWidth: 0,
+                        }
+                      : { r: 0 }
+                  }
+                  activeDot={{ r: (config.marker_size ?? 4) + 1 }}
+                  isAnimationActive={config.animation_enabled !== false}
                 >
                   {config.show_data_labels && (
                     <LabelList
                       dataKey={f}
                       position="top"
-                      style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
+                      style={{
+                        fontSize: 10,
+                        fill: "var(--color-text-tertiary)",
+                        fontWeight: 700,
+                      }}
                       formatter={formatValue}
                     />
                   )}
@@ -1090,9 +2090,10 @@ export default function DashboardChartPreview({
               seriesType === "stacked_area" ||
               seriesType === "percent_area"
             ) {
-              const fillSrc = config.gradient_fill || isStackedArea || isPercentArea
-                ? `url(#grad_${f})`
-                : color;
+              const fillSrc =
+                config.gradient_fill || isStackedArea || isPercentArea
+                  ? `url(#grad_${f})`
+                  : color;
               return (
                 <Area
                   yAxisId={axisId}
@@ -1100,22 +2101,42 @@ export default function DashboardChartPreview({
                   dataKey={f}
                   stackId={isStackedArea || isPercentArea ? "stack" : undefined}
                   stroke={color}
-                  strokeWidth={2}
+                  strokeWidth={config.line_width ?? 2}
+                  strokeDasharray={config.stroke_dash || ""}
                   fill={fillSrc}
-                  fillOpacity={config.gradient_fill || isStackedArea || isPercentArea ? 1 : 0.15}
-                  type={curveType}
-                  dot={config.show_markers
-                    ? { r: 3, fill: color, stroke: "var(--color-bg-raised)", strokeWidth: 2 }
-                    : false
+                  fillOpacity={
+                    config.gradient_fill || isStackedArea || isPercentArea
+                      ? 1
+                      : 0.15
                   }
-                  activeDot={{ r: 5 }}
-                  isAnimationActive={false}
+                  type={
+                    config.curve_type === "basis"
+                      ? "natural"
+                      : config.curve_type || "monotone"
+                  }
+                  connectNulls={config.connect_nulls !== false}
+                  dot={
+                    config.show_markers
+                      ? {
+                          r: config.marker_size ?? 4,
+                          fill: color,
+                          stroke: color,
+                          strokeWidth: 0,
+                        }
+                      : false
+                  }
+                  activeDot={{ r: (config.marker_size ?? 4) + 1 }}
+                  isAnimationActive={config.animation_enabled !== false}
                 >
                   {config.show_data_labels && (
                     <LabelList
                       dataKey={f}
                       position="top"
-                      style={{ fontSize: 8, fill: "var(--color-text-tertiary)", fontWeight: 700 }}
+                      style={{
+                        fontSize: 10,
+                        fill: "var(--color-text-tertiary)",
+                        fontWeight: 700,
+                      }}
                       formatter={formatValue}
                     />
                   )}
@@ -1125,6 +2146,20 @@ export default function DashboardChartPreview({
 
             return null;
           })}
+          {config.show_trend_line && (
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="_trend"
+              stroke="var(--color-accent)"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              dot={false}
+              activeDot={false}
+              name="Trend Line"
+              isAnimationActive={config.animation_enabled !== false}
+            />
+          )}
         </ComposedChart>
       </ChartContainer>
     );
@@ -1285,34 +2320,36 @@ export default function DashboardChartPreview({
             )}
 
           {/* Chart / Table toggle */}
-          {chartType !== "kpi" && config?.chart_type !== "pivot_table" && (
-            <div className="flex items-center bg-bg-muted border border-border-default rounded-lg p-0.5 gap-0.5">
-              <button
-                onClick={() =>
-                  onConfigChange?.({ ...config, view_mode: "chart" })
-                }
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
-                  chartType !== "table"
-                    ? "bg-accent text-white"
-                    : "text-text-quaternary hover:text-text-primary"
-                }`}
-              >
-                <BarChart3 size={12} /> Chart
-              </button>
-              <button
-                onClick={() =>
-                  onConfigChange?.({ ...config, view_mode: "table" })
-                }
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
-                  chartType === "table"
-                    ? "bg-accent text-white"
-                    : "text-text-quaternary hover:text-text-primary"
-                }`}
-              >
-                <Table2 size={12} /> Table
-              </button>
-            </div>
-          )}
+          {chartType !== "kpi" &&
+            chartType !== "table" &&
+            chartType !== "pivot_table" && (
+              <div className="flex items-center bg-bg-muted border border-border-default rounded-lg p-0.5 gap-0.5">
+                <button
+                  onClick={() =>
+                    onConfigChange?.({ ...config, view_mode: "chart" })
+                  }
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
+                    chartType !== "table"
+                      ? "bg-accent text-white"
+                      : "text-text-quaternary hover:text-text-primary"
+                  }`}
+                >
+                  <BarChart3 size={12} /> Chart
+                </button>
+                <button
+                  onClick={() =>
+                    onConfigChange?.({ ...config, view_mode: "table" })
+                  }
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[11px] font-bold ${
+                    chartType === "table"
+                      ? "bg-accent text-white"
+                      : "text-text-quaternary hover:text-text-primary"
+                  }`}
+                >
+                  <Table2 size={12} /> Table
+                </button>
+              </div>
+            )}
 
           {/* Edit / Remove */}
           {isEditing && (
@@ -1335,7 +2372,7 @@ export default function DashboardChartPreview({
       </div>
 
       {/* Content fills remaining height exactly — NO extra wrapping overflow */}
-      <div className="flex-1 min-h-0 relative overflow-hidden">
+      <div className="flex-1 h-full w-full relative overflow-hidden z-10">
         {renderContent()}
       </div>
     </div>

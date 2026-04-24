@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   BarChart3, Code2, Save, AlertCircle, Database, CheckCircle2,
-  Activity, Zap, Ruler, Palette, Settings, Eye, PenLine, ArrowLeft, Maximize2, Minimize2, ChevronDown, RefreshCw, X, Loader2, Table2
+  Activity, PenLine, ArrowLeft, RefreshCw, X, Loader2, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
 import { getDataset, executeQuery, updateVisualization, getVisualization, listDatasets, listSavedQueries, createVisualization, getSavedQuery } from '../lib/api';
 import { buildSQL } from '../lib/sqlBuilder';
 import ChartBuilder from '../components/visualizations/ChartBuilder';
 import ChartPreview from '../components/visualizations/ChartPreview';
+import ChartTypeGallery from '../components/visualizations/ChartTypeGallery';
 import SearchableSelect from '../components/ui/SearchableSelect';
 import { useToast } from '../components/ui/Toast';
 
@@ -67,19 +68,18 @@ export default function VisualizationPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Resize state
-  const [leftW, setLeftW] = useState(420);
+  // Panel Expand/Collapse State
+  const [galleryExpanded, setGalleryExpanded] = useState(false);
+  const [settingsW, setSettingsW] = useState(320);
   const containerRef = useRef(null);
 
-  const startLeftResize = (e) => {
+  const makeResizer = (setter, min, max) => (e) => {
     e.preventDefault();
     document.body.classList.add('qb-resizing');
     const startX = e.clientX;
-    const startW = leftW;
-    const onMove = (ev) => {
-      const newW = Math.max(300, Math.min(600, startW + (ev.clientX - startX)));
-      setLeftW(newW);
-    };
+    let startW;
+    setter((w) => { startW = w; return w; });
+    const onMove = (ev) => setter(Math.max(min, Math.min(max, startW + (ev.clientX - startX))));
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
@@ -88,6 +88,9 @@ export default function VisualizationPage() {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   };
+  const startSettingsResize = makeResizer(setSettingsW, 260, 500);
+  // Keep compat alias
+  const leftW = settingsW;
 
   // 1. Initial Load (Edit Mode or Param Init)
   useEffect(() => {
@@ -207,6 +210,11 @@ export default function VisualizationPage() {
     ds: datasetInfo?.id
   });
 
+  // Clear data when view mode changes to avoid stale raw data in charts
+  useEffect(() => {
+    setQueryData([]);
+  }, [config.view_mode]);
+
   useEffect(() => {
     if (!autoUpdate || !datasetInfo) return;
     clearTimeout(autoUpdateTimer.current);
@@ -316,9 +324,8 @@ export default function VisualizationPage() {
 
   return (
     <div 
-      className="flex flex-col h-full overflow-hidden bg-bg-base" 
+      className="flex flex-col h-full overflow-hidden bg-bg-base"
       ref={containerRef}
-      style={{ "--qb-left-w": isFullscreen ? "0px" : `${leftW}px` }}
     >
       {/* ── Outer Toolbar (Matches QB) ── */}
       {!isFullscreen && (
@@ -407,30 +414,48 @@ export default function VisualizationPage() {
 
       {/* ── Core Workspace ── */}
       <div className="qb-workspace">
-        
-        {/* Left Panel (Builder) */}
+
+        {/* ── Panel 1: Chart Type Gallery ── */}
         {!isFullscreen && (
-          <div className="qb-left-panel" style={{ width: "var(--qb-left-w)" }}>
-            {selectedSource ? (
-              <ChartBuilder
-              columns={dynamicColumns}
+          <div
+            className="h-full border-r border-border-muted overflow-hidden flex flex-col shrink-0 transition-all duration-300 ease-in-out z-20 shadow-xl relative"
+            style={{ 
+              width: galleryExpanded ? 280 : 96, 
+              background: 'var(--color-bg-surface)' 
+            }}
+          >
+            <ChartTypeGallery
               config={config}
               onConfigChange={setConfig}
-              onFieldClick={handleFieldClick}
-              uniqueValues={uniqueValues}
-              onValueFetch={getUniqueValuesForColumn}
+              isCollapsed={!galleryExpanded}
+              onToggle={() => setGalleryExpanded(!galleryExpanded)}
             />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-text-quaternary">
-              <Database size={28} />
-              <p className="text-[13px] font-medium">Select a data source first</p>
-            </div>
-          )}
-        </div>
+          </div>
         )}
 
-        {/* Resize Handle */}
-        {!isFullscreen && <div className="qb-resize-handle" onMouseDown={startLeftResize} />}
+        {/* ── Panel 2: Chart Builder / Settings ── */}
+        {!isFullscreen && (
+          <div className="qb-left-panel" style={{ width: settingsW }}>
+            {selectedSource ? (
+              <ChartBuilder
+                columns={dynamicColumns}
+                config={config}
+                onConfigChange={setConfig}
+                onFieldClick={handleFieldClick}
+                uniqueValues={uniqueValues}
+                onValueFetch={getUniqueValuesForColumn}
+              />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-text-quaternary p-6">
+                <Database size={28} />
+                <p className="text-[13px] font-medium">Select a data source to begin</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings Resize Handle */}
+        {!isFullscreen && <div className="qb-resize-handle" onMouseDown={startSettingsResize} />}
 
         {/* Right Panel (Preview) */}
         <div className="qb-right-panel" style={{ background: 'var(--color-bg-base)' }}>

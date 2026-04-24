@@ -21,7 +21,7 @@ const ChartContainer = React.forwardRef(({ id, className, children, config, ...p
         data-chart={chartId}
         ref={ref}
         className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
           className
         )}
         {...props}
@@ -184,7 +184,7 @@ ChartTooltipContent.displayName = "ChartTooltipContent"
 const ChartLegend = RechartsPrimitive.Legend
 
 const ChartLegendContent = React.forwardRef(
-  ({ className, hideIcon = false, payload, verticalAlign = "bottom", nameKey }, ref) => {
+  ({ className, hideIcon = false, payload, verticalAlign = "bottom", layout = "horizontal", nameKey }, ref) => {
     const { config } = useChart()
     if (!payload?.length) return null
 
@@ -192,34 +192,43 @@ const ChartLegendContent = React.forwardRef(
       <div
         ref={ref}
         className={cn(
-          "flex items-center justify-center gap-4",
-          verticalAlign === "top" ? "pb-3" : "pt-3",
+          "flex flex-wrap items-center justify-center gap-x-6 gap-y-2",
+          layout === "vertical" ? "flex-col items-start px-4" : "flex-row",
+          verticalAlign === "top" ? "pb-4" : "pt-4",
           className
         )}
       >
-        {payload.map((item, index) => {
-          const key = `${nameKey || item.dataKey || "value"}`
-          const itemConfig = getPayloadConfigFromPayload(config, item, key)
-
-          return (
-            <div
-              key={item.value || index}
-              className={cn(
-                "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground"
-              )}
-            >
-              {itemConfig?.icon && !hideIcon ? (
-                <itemConfig.icon />
-              ) : (
-                <div
-                  className="h-2 w-2 shrink-0 rounded-[2px]"
-                  style={{ backgroundColor: item.color }}
-                />
-              )}
-              {itemConfig?.label}
-            </div>
+        {payload
+          .filter((item, index, self) => 
+            index === self.findIndex((t) => t.value === item.value)
           )
-        })}
+          .map((item, index) => {
+            const key = `${nameKey || item.dataKey || "value"}`
+            const itemConfig = getPayloadConfigFromPayload(config, item, key)
+            const color = item.color || item.payload?.fill || "var(--color-accent)"
+
+            return (
+              <div
+                key={item.value || index}
+                className={cn(
+                  "flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] text-text-tertiary hover:text-text-primary transition-all duration-200 cursor-default"
+                )}
+              >
+                {itemConfig?.icon && !hideIcon ? (
+                  <itemConfig.icon />
+                ) : (
+                  <div
+                    className="h-2 w-2 shrink-0 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+                    style={{ 
+                      backgroundColor: color,
+                      boxShadow: `0 0 12px ${color}40, inset 0 0 4px rgba(255,255,255,0.3)`
+                    }}
+                  />
+                )}
+                {itemConfig?.label || item.value}
+              </div>
+            )
+          })}
       </div>
     )
   }

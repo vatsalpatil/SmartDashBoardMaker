@@ -1,122 +1,200 @@
 /**
- * Chart Presets Catalog
- * Expanded to include as many Shadcn-style variations as possible.
+ * Chart Catalog — Flat, one entry per unique chart type.
+ * All visual variations are controlled through Settings, not separate types.
  */
 
 export const CHART_CATALOG = [
   {
-    id: 'area',
-    label: 'Area Charts',
-    icon: 'TrendingUp',
-    presets: [
-      { id: 'area_default', label: 'Area Default', overrides: { chart_type: 'area' } },
-      { id: 'area_linear', label: 'Area Linear', overrides: { chart_type: 'area', curve_type: 'linear' } },
-      { id: 'area_step', label: 'Area Step', overrides: { chart_type: 'area', curve_type: 'step' } },
-      { id: 'area_stacked', label: 'Area Stacked', overrides: { chart_type: 'stacked_area' } },
-      { id: 'area_stacked_expand', label: 'Area Stacked Expand', overrides: { chart_type: 'percent_area' } },
-      { id: 'area_dot', label: 'Area with Dots', overrides: { chart_type: 'area', show_markers: true } },
-      { id: 'area_gradient', label: 'Area Gradient', overrides: { chart_type: 'area', gradient_fill: true } },
-    ]
+    id: 'bar',
+    label: 'Bar Chart',
+    icon: 'BarChart3',
+    color: '#6366f1',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Compare values across categories',
+    bestFor: 'Category comparisons, rankings — supports vertical, horizontal, stacked & 100%',
+    chart_type: 'bar',
   },
   {
-    id: 'bar',
-    label: 'Bar Charts',
-    icon: 'BarChart3',
-    presets: [
-      { id: 'bar_default', label: 'Bar Default', overrides: { chart_type: 'bar' } },
-      { id: 'bar_horizontal', label: 'Bar Horizontal', overrides: { chart_type: 'horizontal_bar' } },
-      { id: 'bar_stacked', label: 'Bar Stacked', overrides: { chart_type: 'stacked_bar' } },
-      { id: 'bar_stacked_expand', label: 'Bar Stacked Expand', overrides: { chart_type: 'stacked_percent_bar' } },
-      { id: 'bar_label', label: 'Bar with Label', overrides: { chart_type: 'bar', show_data_labels: true } },
-      { id: 'bar_mixed', label: 'Bar Mixed', overrides: { chart_type: 'composed', default_series: { 0: 'bar', 1: 'line' } } },
-      { id: 'bar_active', label: 'Bar Active', overrides: { chart_type: 'bar', active_cursor: true } },
-      { id: 'bar_negative', label: 'Bar Negative', overrides: { chart_type: 'bar', conditional_color: true } },
-    ]
+    id: 'composed',
+    label: 'Smart Combine',
+    icon: 'Layers',
+    color: '#0ea5e9',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Combine Line, Bar, and Area charts',
+    bestFor: 'Comparing metrics with different scales or types',
+    chart_type: 'composed',
   },
   {
     id: 'line',
-    label: 'Line Charts',
+    label: 'Line Chart',
     icon: 'LineChart',
-    presets: [
-      { id: 'line_default', label: 'Line Default', overrides: { chart_type: 'line' } },
-      { id: 'line_linear', label: 'Line Linear', overrides: { chart_type: 'line', curve_type: 'linear' } },
-      { id: 'line_step', label: 'Line Step', overrides: { chart_type: 'line', curve_type: 'step' } },
-      { id: 'line_dot', label: 'Line with Dots', overrides: { chart_type: 'line', show_markers: true } },
-      { id: 'line_label', label: 'Line with Label', overrides: { chart_type: 'line', show_data_labels: true } },
-      { id: 'line_custom_dot', label: 'Line Custom Dot', overrides: { chart_type: 'line', custom_dots: true } },
-    ]
+    color: '#8b5cf6',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Show trends over a continuous axis',
+    bestFor: 'Time series, trends — supports smooth, step, dotted & shaded fill',
+    chart_type: 'line',
+  },
+  {
+    id: 'area',
+    label: 'Area Chart',
+    icon: 'TrendingUp',
+    color: '#06b6d4',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Line with filled area — emphasise magnitude',
+    bestFor: 'Volume over time — supports stacked & 100% normalized',
+    chart_type: 'area',
   },
   {
     id: 'pie',
-    label: 'Pie Charts',
+    label: 'Pie / Donut',
     icon: 'PieChart',
-    presets: [
-      { id: 'pie_default', label: 'Pie Default', overrides: { chart_type: 'pie' } },
-      { id: 'pie_label', label: 'Pie Header Label', overrides: { chart_type: 'pie', show_data_labels: true } },
-      { id: 'pie_label_custom', label: 'Pie Custom Label', overrides: { chart_type: 'pie', custom_labels: true } },
-      { id: 'pie_donut', label: 'Donut Chart', overrides: { chart_type: 'donut' } },
-      { id: 'pie_donut_active', label: 'Donut Active', overrides: { chart_type: 'donut', active_sector: true } },
-      { id: 'pie_donut_text', label: 'Donut with Text', overrides: { chart_type: 'donut', inner_text: true } },
-      { id: 'pie_stacked', label: 'Pie Stacked', overrides: { chart_type: 'nested_donut' } },
-    ]
+    color: '#ec4899',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Proportional slices of a whole',
+    bestFor: 'Up to 6–7 categories, part-to-whole — supports hollow center (Donut)',
+    chart_type: 'pie',
   },
   {
     id: 'radar',
-    label: 'Radar Charts',
+    label: 'Radar Chart',
     icon: 'Activity',
-    presets: [
-      { id: 'radar_default', label: 'Radar Default', overrides: { chart_type: 'radar' } },
-      { id: 'radar_dots', label: 'Radar Dots', overrides: { chart_type: 'radar', show_markers: true } },
-      { id: 'radar_lines', label: 'Radar Lines Only', overrides: { chart_type: 'radar', fill_opacity: 0 } },
-    ]
+    color: '#22c55e',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Multi-variable comparison in a spider-web layout',
+    bestFor: 'Performance across multiple dimensions',
+    chart_type: 'radar',
   },
   {
-    id: 'radial',
-    label: 'Radial Charts',
+    id: 'funnel',
+    label: 'Funnel',
     icon: 'Layers',
-    presets: [
-      { id: 'radial_default', label: 'Radial Default', overrides: { chart_type: 'radial_bar' } },
-      { id: 'radial_label', label: 'Radial Labeled', overrides: { chart_type: 'radial_bar', show_data_labels: true } },
-      { id: 'radial_stacked', label: 'Radial Stacked', overrides: { chart_type: 'radial_bar', stacked: true } },
-    ]
+    color: '#7c3aed',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Progressive reduction across process stages',
+    bestFor: 'Sales funnel, conversion rates, pipelines',
+    chart_type: 'funnel',
   },
   {
-    id: 'data',
-    label: 'Data Views',
+    id: 'treemap',
+    label: 'Treemap',
+    icon: 'Layers',
+    color: '#b45309',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Hierarchical data as nested rectangles',
+    bestFor: 'Part-to-whole with hierarchy',
+    chart_type: 'treemap',
+  },
+  {
+    id: 'world_map',
+    label: 'World Map',
+    icon: 'Globe',
+    color: '#0ea5e9',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Choropleth world map — colour countries by value',
+    bestFor: 'Country-level KPIs, geographic distributions',
+    chart_type: 'world_map',
+  },
+  {
+    id: 'candlestick',
+    label: 'Candlestick',
+    icon: 'Activity',
+    color: '#10b981',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Show open, high, low, close values',
+    bestFor: 'Financial data, stock price movements',
+    chart_type: 'candlestick',
+  },
+
+  {
+    id: 'kpi',
+    label: 'KPI Card',
+    icon: 'Zap',
+    color: '#64748b',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Bold single-number for at-a-glance metrics',
+    bestFor: 'Revenue, users, churn, NPS — headline metrics',
+    chart_type: 'kpi',
+  },
+  {
+    id: 'table',
+    label: 'Data Table',
     icon: 'Table2',
-    presets: [
-      { id: 'kpi',           label: 'KPI Card',        overrides: { chart_type: 'kpi' } },
-    ]
+    color: '#475569',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Tabular view with sortable columns',
+    bestFor: 'Full detail view, data export',
+    chart_type: 'table',
+    view_mode: 'table',
+  },
+  {
+    id: 'pivot_table',
+    label: 'Pivot Table',
+    icon: 'Table2',
+    color: '#334155',
+    category: 'all',
+    categoryLabel: 'All Charts',
+    desc: 'Cross-tabulation matrix',
+    bestFor: 'Multi-dimensional aggregation, cross-analysis',
+    chart_type: 'pivot_table',
+    view_mode: 'table',
   },
 ];
 
-export const PRESET_MAP = {};
-CHART_CATALOG.forEach(cat => {
-  cat.presets.forEach(p => {
-    PRESET_MAP[p.id] = { ...p, category: cat.id, categoryLabel: cat.label };
-  });
-});
+/** Map by id for O(1) lookup */
+export const PRESET_MAP = Object.fromEntries(CHART_CATALOG.map((c) => [c.id, c]));
 
+/** Get the catalog entry for a given chart_type */
 export function getPresetForType(chartType) {
-  if (PRESET_MAP[chartType]) return PRESET_MAP[chartType];
-  for (const p of Object.values(PRESET_MAP)) {
-    if (p.overrides.chart_type === chartType) return p;
-  }
-  return PRESET_MAP['bar_default'];
+  return CHART_CATALOG.find((c) => c.chart_type === chartType) || CHART_CATALOG[0];
 }
 
-export const COLOR_PALETTES = {
-  default:    { label: 'Default',      colors: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#22c55e', '#06b6d4', '#f97316', '#a855f7', '#14b8a6', '#ef4444', '#3b82f6', '#84cc16'] },
-  vibrant:    { label: 'Vibrant',      colors: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7CB342', '#E91E63', '#00BCD4'] },
-  pastel:     { label: 'Pastel',       colors: ['#a5b4fc', '#c4b5fd', '#f9a8d4', '#fcd34d', '#6ee7b7', '#67e8f9', '#fdba74', '#d8b4fe', '#5eead4', '#fca5a5'] },
-  monochrome: { label: 'Monochrome',   colors: ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'] },
-};
+export const CHART_CATEGORIES = [
+  { id: 'all', label: 'All Charts' },
+];
 
-export const DEFAULT_VISUAL_CONFIG = {
-  axis_y_mode: 'smart',
-  axis_x_rotation: 0,
-  color_palette: 'default',
-  show_grid: true,
-  legend_position: 'bottom',
-  animation_enabled: true,
+export const COLOR_PALETTES = {
+  default: {
+    label: 'Default',
+    colors: ['#4f46e5', '#f59e0b', '#06b6d4', '#ec4899', '#22c55e', '#8b5cf6', '#f97316', '#14b8a6', '#ef4444', '#3b82f6', '#a855f7', '#84cc16'],
+  },
+  vibrant: {
+    label: 'Vibrant',
+    colors: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7CB342', '#E91E63', '#00BCD4'],
+  },
+  pastel: {
+    label: 'Pastel',
+    colors: ['#a5b4fc', '#c4b5fd', '#f9a8d4', '#fcd34d', '#6ee7b7', '#67e8f9', '#fdba74', '#d8b4fe', '#5eead4', '#fca5a5'],
+  },
+  monochrome: {
+    label: 'Monochrome',
+    colors: ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'],
+  },
+  warm: {
+    label: 'Warm',
+    colors: ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#e11d48', '#dc2626'],
+  },
+  cool: {
+    label: 'Cool',
+    colors: ['#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#22d3ee', '#38bdf8'],
+  },
+  nature: {
+    label: 'Nature',
+    colors: ['#16a34a', '#15803d', '#166534', '#4ade80', '#86efac', '#bbf7d0', '#65a30d', '#a3e635'],
+  },
+  sunset: {
+    label: 'Sunset',
+    colors: ['#7c3aed', '#9333ea', '#c026d3', '#db2777', '#e11d48', '#f97316', '#f59e0b', '#fbbf24'],
+  },
 };

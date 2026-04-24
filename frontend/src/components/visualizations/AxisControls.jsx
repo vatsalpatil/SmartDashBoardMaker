@@ -8,7 +8,7 @@ export default function AxisControls({ config, onConfigChange }) {
   const yMode = config?.axis_y_mode || 'smart';
   const yMin = config?.axis_y_min ?? '';
   const yMax = config?.axis_y_max ?? '';
-  const yType = config?.axis_y_type || 'linear';
+
   const xRotation = config?.axis_x_rotation ?? 0;
   const reversed = config?.axis_reversed || false;
   const yLabel = config?.axis_y_label || '';
@@ -84,12 +84,6 @@ export default function AxisControls({ config, onConfigChange }) {
             </div>
           )}
 
-          {/* Y-Axis Type */}
-          <div style={sectionLabel}>Y-Axis Scale Type</div>
-          <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-            {toggleBtn(yType === 'linear', () => update({ axis_y_type: 'linear' }), 'Linear')}
-            {toggleBtn(yType === 'logarithmic', () => update({ axis_y_type: 'logarithmic' }), 'Log Scale')}
-          </div>
 
           {/* X-axis label rotation */}
           <div style={sectionLabel}>X-Axis Label Angle</div>
