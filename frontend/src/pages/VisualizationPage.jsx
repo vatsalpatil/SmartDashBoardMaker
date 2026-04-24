@@ -155,9 +155,9 @@ export default function VisualizationPage() {
       } else if (src.startsWith('query_')) {
         const id = src.replace('query_', '');
         const savedQ = await getSavedQuery(id);
-        const res = await executeQuery(savedQ.sql, savedQ.dataset_id, 1, 1);
-        setQueryInfo({ id, sql_text: savedQ.sql });
-        setDatasetInfo({ id: savedQ.dataset_id, table_name: `(${savedQ.sql})` });
+        const res = await executeQuery(savedQ.sql_text, savedQ.dataset_id, 1, 1);
+        setQueryInfo({ id, sql_text: savedQ.sql_text });
+        setDatasetInfo({ id: savedQ.dataset_id, table_name: `(${savedQ.sql_text})` });
         
         if (res.columns) {
            setDynamicColumns(res.columns.map(c => ({ name: c, type: 'string' })));
@@ -274,7 +274,8 @@ export default function VisualizationPage() {
         await updateVisualization(editVizId, payload);
         toast.success('Visualization updated!');
       } else {
-        await createVisualization(payload);
+        const res = await createVisualization(payload);
+        if (res?.id) setEditVizId(res.id);
         toast.success('Visualization saved to library!');
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 3000);

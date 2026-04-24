@@ -45,13 +45,26 @@ async def get_visualization(viz_id: str):
 
 @router.post("/")
 async def save_visualization(viz: VisualizationBase):
-    viz_id = str(uuid.uuid4())
     with get_db() as conn:
-        conn.execute("""
-            INSERT INTO visualizations (id, name, dataset_id, query_id, chart_type, config)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (viz_id, viz.name, viz.dataset_id, viz.query_id, viz.chart_type, json.dumps(viz.config)))
-        return {"id": viz_id, **viz.dict()}
+        # Check for existing visualization by name
+        cursor = conn.execute("SELECT id FROM visualizations WHERE name = ?", (viz.name,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            viz_id = existing['id']
+            conn.execute("""
+                UPDATE visualizations 
+                SET dataset_id = ?, query_id = ?, chart_type = ?, config = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (viz.dataset_id, viz.query_id, viz.chart_type, json.dumps(viz.config), viz_id))
+            return {"id": viz_id, **viz.dict()}
+        else:
+            viz_id = str(uuid.uuid4())
+            conn.execute("""
+                INSERT INTO visualizations (id, name, dataset_id, query_id, chart_type, config)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (viz_id, viz.name, viz.dataset_id, viz.query_id, viz.chart_type, json.dumps(viz.config)))
+            return {"id": viz_id, **viz.dict()}
 
 @router.put("/{viz_id}")
 async def update_visualization(viz_id: str, viz: VisualizationBase):

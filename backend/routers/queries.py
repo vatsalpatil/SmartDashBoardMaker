@@ -27,18 +27,28 @@ async def list_queries(dataset_id: Optional[str] = None):
 @router.post("/save")
 async def save_query(query: QueryBase):
     with get_db() as conn:
+        # 1. Try to find existing by ID
+        existing_id = None
         if hasattr(query, 'id') and query.id:
-            # Check if it exists
             cursor = conn.execute("SELECT id FROM saved_queries WHERE id = ?", (query.id,))
-            if cursor.fetchone():
-                conn.execute("""
-                    UPDATE saved_queries 
-                    SET name = ?, description = ?, sql_text = ?, dataset_id = ?, config = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (query.name, query.description, query.sql_text, query.dataset_id, query.config, query.id))
-                return {"id": query.id, **query.dict()}
+            row = cursor.fetchone()
+            if row: existing_id = row['id']
+            
+        # 2. Try to find existing by Name if no ID match
+        if not existing_id:
+            cursor = conn.execute("SELECT id FROM saved_queries WHERE name = ?", (query.name,))
+            row = cursor.fetchone()
+            if row: existing_id = row['id']
+
+        if existing_id:
+            conn.execute("""
+                UPDATE saved_queries 
+                SET name = ?, description = ?, sql_text = ?, dataset_id = ?, config = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (query.name, query.description, query.sql_text, query.dataset_id, query.config, existing_id))
+            return {"id": existing_id, **query.dict()}
                 
-        # Generate new ID if not updating
+        # 3. Create new if no match
         new_id = getattr(query, 'id', None) or str(uuid.uuid4())
         conn.execute("""
             INSERT INTO saved_queries (id, name, description, sql_text, dataset_id, config)
@@ -60,6 +70,15 @@ async def save_query_as_dataset(req: SaveDatasetRequest):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (new_dataset_id, req.name, req.name, "", 0, "[]", 1, req.dataset_id, req.sql, 'query'))
         return {"dataset_id": new_dataset_id}
+
+@router.get("/{query_id}")
+async def get_query(query_id: str):
+    with get_db() as conn:
+        cursor = conn.execute("SELECT * FROM saved_queries WHERE id = ?", (query_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Query not found")
+        return dict(row)
 
 @router.delete("/{query_id}")
 async def delete_query(query_id: str):

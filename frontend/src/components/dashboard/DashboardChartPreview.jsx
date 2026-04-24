@@ -2321,8 +2321,8 @@ export default function DashboardChartPreview({
 
           {/* Chart / Table toggle */}
           {chartType !== "kpi" &&
-            chartType !== "table" &&
-            chartType !== "pivot_table" && (
+            config.chart_type !== "table" &&
+            config.chart_type !== "pivot_table" && (
               <div className="flex items-center bg-bg-muted border border-border-default rounded-lg p-0.5 gap-0.5">
                 <button
                   onClick={() =>
