@@ -8,7 +8,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.database import init_db
-from routers import datasets, queries, visualizations, dashboards, external_sources, proxy
+from routers import (
+    datasets,
+    queries,
+    visualizations,
+    dashboards,
+    external_sources,
+    proxy,
+)
 
 
 @asynccontextmanager
