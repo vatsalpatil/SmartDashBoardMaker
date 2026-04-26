@@ -24,3 +24,4 @@ metadata.db
 backend/duckdb.db
 *.log
 .DS_Store
+TiDB_Credentials/
