@@ -20,7 +20,12 @@ const DB_TYPES = [
 export default function DbConnectModal({ onClose, onSuccess }) {
   const [activeTab, setActiveTab] = useState('new'); // 'new' | 'saved'
   const [dbType, setDbType] = useState('sqlite');
-  const [form, setForm] = useState({ host: 'localhost', port: '', database: '', username: '', password: '', name: '' });
+  const [form, setForm] = useState({ 
+    host: 'localhost', port: '', database: '', username: '', password: '', name: '',
+    sslMode: 'If available', sslKey: '', sslCert: '', sslCa: '', sslCipher: '',
+    sslKeyContent: '', sslCertContent: '', sslCaContent: ''
+  });
+  const [formTab, setFormTab] = useState('parameters'); // 'parameters' | 'ssl'
   const [step, setStep] = useState('form'); // 'form' | 'probing' | 'tables' | 'registering' | 'error'
   const [probeResult, setProbeResult] = useState(null);
   const [selectedTables, setSelectedTables] = useState(new Set());
@@ -63,6 +68,14 @@ export default function DbConnectModal({ onClose, onSuccess }) {
         database: form.database,
         username: form.username,
         password: form.password,
+        ssl_mode: form.sslMode,
+        ssl_key: form.sslKey,
+        ssl_cert: form.sslCert,
+        ssl_ca: form.sslCa,
+        ssl_cipher: form.sslCipher,
+        ssl_key_content: form.sslKeyContent,
+        ssl_cert_content: form.sslCertContent,
+        ssl_ca_content: form.sslCaContent,
       };
       const result = await probeDbConnection(payload);
       setProbeResult(result);
@@ -112,6 +125,14 @@ export default function DbConnectModal({ onClose, onSuccess }) {
           database: form.database,
           username: form.username,
           password: form.password,
+          ssl_mode: form.sslMode,
+          ssl_key: form.sslKey,
+          ssl_cert: form.sslCert,
+          ssl_ca: form.sslCa,
+          ssl_cipher: form.sslCipher,
+          ssl_key_content: form.sslKeyContent,
+          ssl_cert_content: form.sslCertContent,
+          ssl_ca_content: form.sslCaContent,
         });
         connectionId = saved.id;
       } catch (err) {
@@ -150,12 +171,51 @@ export default function DbConnectModal({ onClose, onSuccess }) {
     onClose();
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+
   const reset = () => {
     setStep('form');
+    setFormTab('parameters');
     setProbeResult(null);
     setError('');
     setSelectedTables(new Set());
     setActiveConnection(null);
+  };
+
+  const handleSslDrop = async (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer?.files || e.target?.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      const text = await file.text();
+      const name = file.name.toLowerCase();
+      
+      // Auto-detect based on filename or content
+      let type = '';
+      if (name.includes('key') || text.includes('PRIVATE KEY')) {
+        type = 'Key';
+        setField('sslKey', file.name);
+        setField('sslKeyContent', text);
+      } else if (name.includes('cert') || name.includes('crt')) {
+        type = 'Cert';
+        setField('sslCert', file.name);
+        setField('sslCertContent', text);
+      } else if (name.includes('ca') || name.includes('root') || text.includes('CERTIFICATE')) {
+        // Fallback for certificate if not explicitly named cert
+        type = 'CA';
+        setField('sslCa', file.name);
+        setField('sslCaContent', text);
+      }
+      
+      if (type) {
+        toast.success(`Detected and loaded SSL ${type}: ${file.name}`);
+      } else {
+        toast.error(`Could not detect SSL type for ${file.name}`);
+      }
+    }
   };
 
   return (
@@ -224,31 +284,122 @@ export default function DbConnectModal({ onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* Connection name */}
-              <InputField label="Connection Name (optional)" value={form.name} onChange={v => setField('name', v)} placeholder={`${dbType}:my-db`} />
-
-              {/* Host + Port (only if applicable) */}
+              {/* Form sub-tabs (only if hasHost) */}
               {selectedDbType?.hasHost && (
-                <div className="grid grid-cols-[1fr_100px] gap-3">
-                  <InputField label="Host" value={form.host} onChange={v => setField('host', v)} placeholder="localhost" />
-                  <InputField label="Port" value={form.port} onChange={v => setField('port', v)} placeholder={defaultPort[dbType] || '0'} />
+                <div className="flex gap-4 border-b border-border-muted pb-2 mt-2">
+                  <button
+                    onClick={() => setFormTab('parameters')}
+                    className={`text-[12px] font-semibold transition-colors ${formTab === 'parameters' ? 'text-accent border-b border-accent -mb-[9px]' : 'text-text-tertiary hover:text-text-secondary'}`}
+                  >
+                    Parameters
+                  </button>
+                  <button
+                    onClick={() => setFormTab('ssl')}
+                    className={`text-[12px] font-semibold transition-colors ${formTab === 'ssl' ? 'text-accent border-b border-accent -mb-[9px]' : 'text-text-tertiary hover:text-text-secondary'}`}
+                  >
+                    SSL
+                  </button>
                 </div>
               )}
 
-              {/* Database path/name */}
-              <InputField
-                label={dbType === 'sqlite' || dbType === 'duckdb' ? 'File Path' : 'Database Name'}
-                value={form.database}
-                onChange={v => setField('database', v)}
-                placeholder={dbType === 'sqlite' ? '/path/to/data.db' : dbType === 'duckdb' ? '/path/to/data.duckdb' : 'mydb'}
-              />
+              {formTab === 'parameters' || !selectedDbType?.hasHost ? (
+                <>
+                  {/* Connection name */}
+                  <InputField label="Connection Name (optional)" value={form.name} onChange={v => setField('name', v)} placeholder={`${dbType}:my-db`} />
 
-              {/* Username + Password (only if applicable) */}
-              {selectedDbType?.hasHost && (
-                <div className="grid grid-cols-2 gap-3">
-                  <InputField label="Username" value={form.username} onChange={v => setField('username', v)} placeholder="user" />
-                  <InputField label="Password" type="password" value={form.password} onChange={v => setField('password', v)} placeholder="••••••••" />
-                </div>
+                  {/* Host + Port (only if applicable) */}
+                  {selectedDbType?.hasHost && (
+                    <div className="grid grid-cols-[1fr_100px] gap-3">
+                      <InputField label="Host" value={form.host} onChange={v => setField('host', v)} placeholder="localhost" />
+                      <InputField label="Port" value={form.port} onChange={v => setField('port', v)} placeholder={defaultPort[dbType] || '0'} />
+                    </div>
+                  )}
+
+                  {/* Database path/name */}
+                  <InputField
+                    label={dbType === 'sqlite' || dbType === 'duckdb' ? 'File Path' : 'Database Name'}
+                    value={form.database}
+                    onChange={v => setField('database', v)}
+                    placeholder={dbType === 'sqlite' ? '/path/to/data.db' : dbType === 'duckdb' ? '/path/to/data.duckdb' : 'mydb'}
+                  />
+
+                  {/* Username + Password (only if applicable) */}
+                  {selectedDbType?.hasHost && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <InputField label="Username" value={form.username} onChange={v => setField('username', v)} placeholder="user" />
+                      <InputField label="Password" type="password" value={form.password} onChange={v => setField('password', v)} placeholder="••••••••" />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[12px] font-semibold text-text-tertiary uppercase tracking-wider">Use SSL</label>
+                    <select
+                      value={form.sslMode}
+                      onChange={e => setField('sslMode', e.target.value)}
+                      className="px-3.5 py-3 bg-bg-raised border border-border-default rounded-xl text-[13px] text-text-primary outline-none focus:border-accent transition-colors"
+                    >
+                      <option value="disable">Disable</option>
+                      <option value="If available">If available</option>
+                      <option value="require">Require</option>
+                      <option value="verify-ca">Verify CA</option>
+                      <option value="verify-full">Verify Full</option>
+                    </select>
+                  </div>
+                  <div 
+                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleSslDrop}
+                    className={`mt-2 border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                      isDragging ? 'border-accent bg-accent/10' : 'border-border-muted bg-bg-raised hover:border-accent/50'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                        <PlugZap size={18} className="text-accent" />
+                      </div>
+                      <p className="text-[13px] font-semibold text-text-primary">
+                        Drag & Drop SSL Files Here
+                      </p>
+                      <p className="text-[12px] text-text-tertiary">
+                        We'll auto-detect Key, Cert, and CA files based on their content or filename.
+                      </p>
+                      <input 
+                        type="file" 
+                        multiple 
+                        className="hidden" 
+                        id="ssl-upload" 
+                        onChange={handleSslDrop} 
+                        accept=".pem,.crt,.key,.cer"
+                      />
+                      <label 
+                        htmlFor="ssl-upload" 
+                        className="mt-2 text-[12px] font-semibold text-accent hover:underline cursor-pointer"
+                      >
+                        Browse Files
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 mt-4">
+                    {/* Status display for loaded files */}
+                    <div className="flex flex-col gap-2 p-3 bg-bg-raised/50 border border-border-muted rounded-xl">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-text-tertiary uppercase tracking-tight">
+                        <span>SSL File Status</span>
+                        <CheckCircle2 size={12} className={form.sslKeyContent || form.sslCertContent || form.sslCaContent ? 'text-accent' : 'text-text-quaternary'} />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 gap-1.5 mt-1">
+                        <FileStatusLabel label="Key" filename={form.sslKey} isLoaded={!!form.sslKeyContent} />
+                        <FileStatusLabel label="Cert" filename={form.sslCert} isLoaded={!!form.sslCertContent} />
+                        <FileStatusLabel label="CA" filename={form.sslCa} isLoaded={!!form.sslCaContent} />
+                      </div>
+                    </div>
+
+                    <InputField label="SSL Cipher" value={form.sslCipher} onChange={v => setField('sslCipher', v)} placeholder="Optional: list of permissible ciphers" />
+                  </div>
+                </>
               )}
 
               {step === 'error' && (
@@ -462,6 +613,20 @@ function InputField({ label, value, onChange, placeholder, type = 'text' }) {
         placeholder={placeholder}
         className="px-3.5 py-3 bg-bg-raised border border-border-default rounded-xl text-[13px] text-text-primary placeholder-text-quaternary outline-none focus:border-accent transition-colors font-mono"
       />
+    </div>
+  );
+}
+
+function FileStatusLabel({ label, filename, isLoaded }) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2 bg-bg-surface border border-border-muted/50 rounded-lg">
+      <div className="flex items-center gap-2">
+        <div className={`w-1.5 h-1.5 rounded-full ${isLoaded ? 'bg-accent animate-pulse' : 'bg-text-quaternary'}`} />
+        <span className="text-[12px] font-semibold text-text-secondary w-10">{label}</span>
+      </div>
+      <span className={`text-[12px] truncate max-w-[200px] ${isLoaded ? 'text-text-primary font-medium' : 'text-text-quaternary italic'}`}>
+        {isLoaded ? filename : 'Not loaded'}
+      </span>
     </div>
   );
 }

@@ -309,6 +309,18 @@ export default function DashboardChartPreview({
         ...yFields.filter((f) => rawCols.includes(f) && !xFields.includes(f)),
       ];
 
+      // Auto-detect columns that should be color-coded (contain negative values or keywords)
+      const coloredCols = new Set();
+      cols.forEach(c => {
+         const lowerC = String(c).toLowerCase();
+         if (['change', 'diff', 'profit', 'loss', 'margin', 'growth', 'var', 'pnl'].some(k => lowerC.includes(k))) {
+             coloredCols.add(c);
+         } else {
+             const hasNeg = resolvedData.some(r => typeof r[c] === 'number' && r[c] < 0);
+             if (hasNeg) coloredCols.add(c);
+         }
+      });
+
       // Calculate totals for numeric columns based on mode
       const totals = cols.reduce((acc, col) => {
         const values = resolvedData
@@ -380,10 +392,19 @@ export default function DashboardChartPreview({
                   {cols.map((c) => {
                     const val = row[c];
                     const isNum = typeof val === "number" && !isNaN(val);
+                    const isColored = coloredCols.has(c) && isNum;
+                    
+                    let colorClass = "text-text-primary";
+                    if (isColored) {
+                        if (val > 0) colorClass = "text-emerald drop-shadow-[0_0_8px_rgba(16,185,129,0.2)]";
+                        else if (val < 0) colorClass = "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.2)]";
+                        else colorClass = "text-text-secondary";
+                    }
+
                     return (
                       <td
                         key={c}
-                        className={`px-2 py-1 text-[11px] border-b border-border-muted whitespace-nowrap ${isNum ? "font-semibold text-text-primary tabular-nums tracking-wide" : "font-medium text-text-secondary"}`}
+                        className={`px-2 py-1 text-[11px] border-b border-border-muted whitespace-nowrap ${isNum ? `font-semibold tabular-nums tracking-wide ${colorClass}` : "font-medium text-text-secondary"}`}
                       >
                         {isNum
                           ? val.toLocaleString(undefined, {
@@ -409,16 +430,25 @@ export default function DashboardChartPreview({
                 {cols.map((c, idx) => {
                   const val = totals[c];
                   const isNum = typeof val === "number" && val !== null;
+                  const isColored = coloredCols.has(c) && isNum;
+                  
+                  let totalColor = "text-emerald";
+                  if (isColored) {
+                      if (val > 0) totalColor = "text-emerald drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]";
+                      else if (val < 0) totalColor = "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]";
+                      else totalColor = "text-text-secondary";
+                  }
+
                   return (
                     <td
                       key={`total-${c}`}
                       title={isNum ? val.toLocaleString() : undefined}
-                      className="px-2 py-1.5 text-[11px] font-bold text-emerald border-t border-border-strong whitespace-nowrap tracking-wide"
+                      className={`px-2 py-1.5 text-[11px] font-bold border-t border-border-strong whitespace-nowrap tracking-wide ${totalColor}`}
                     >
                       {idx === 0 ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button className="bg-transparent text-emerald font-bold uppercase outline-none cursor-pointer border-b border-emerald/20 hover:border-emerald text-[10px] nodrag transition-all flex items-center gap-1">
+                            <button className={`bg-transparent font-bold uppercase outline-none cursor-pointer border-b border-current/20 hover:border-current text-[10px] nodrag transition-all flex items-center gap-1 ${totalColor}`}>
                               {aggMode}{" "}
                               <ChevronDown size={10} className="opacity-50" />
                             </button>
@@ -460,6 +490,12 @@ export default function DashboardChartPreview({
       const rowDim = config.x_fields?.[0] || config.x_field;
       const colDim = config.x_fields?.[1];
       const valDim = config.y_fields?.[0] || config.y_field;
+
+      const lowerValDim = String(valDim).toLowerCase();
+      let isColoredPivot = ['change', 'diff', 'profit', 'loss', 'margin', 'growth', 'var', 'pnl'].some(k => lowerValDim.includes(k));
+      if (!isColoredPivot) {
+          isColoredPivot = resolvedData.some(r => typeof r[valDim] === 'number' && r[valDim] < 0);
+      }
 
       if (!colDim || !valDim) {
         return (
@@ -629,10 +665,17 @@ export default function DashboardChartPreview({
                         rowTotal += val;
                         hasValues = true;
                       }
+                      let colorClass = "text-text-primary group-hover/row:text-accent";
+                      if (isColoredPivot && val !== undefined) {
+                          if (val > 0) colorClass = "text-emerald drop-shadow-[0_0_8px_rgba(16,185,129,0.2)]";
+                          else if (val < 0) colorClass = "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.2)]";
+                          else colorClass = "text-text-secondary";
+                      }
+
                       return (
                         <td
                           key={c}
-                          className="px-3 py-1 text-[10px] whitespace-nowrap text-right tabular-nums text-text-primary font-semibold tracking-wide group-hover/row:text-accent transition-colors"
+                          className={`px-3 py-1 text-[10px] whitespace-nowrap text-right tabular-nums font-semibold tracking-wide transition-colors ${colorClass}`}
                         >
                           {val !== undefined
                             ? val.toLocaleString(undefined, {
@@ -642,7 +685,7 @@ export default function DashboardChartPreview({
                         </td>
                       );
                     })}
-                    <td className="px-3 py-1 text-[10px] border-l border-border-strong whitespace-nowrap text-right tabular-nums font-bold text-emerald bg-emerald/[0.02] shadow-inner tracking-wide">
+                    <td className={`px-3 py-1 text-[10px] border-l border-border-strong whitespace-nowrap text-right tabular-nums font-bold shadow-inner tracking-wide ${isColoredPivot ? (rowTotal > 0 ? "text-emerald bg-emerald/[0.02] drop-shadow-[0_0_8px_rgba(16,185,129,0.2)]" : rowTotal < 0 ? "text-red-500 bg-red-500/[0.02] drop-shadow-[0_0_8px_rgba(239,68,68,0.2)]" : "text-text-secondary") : "text-emerald bg-emerald/[0.02]"}`}>
                       {hasValues
                         ? rowTotal.toLocaleString(undefined, {
                             maximumFractionDigits: 2,
@@ -705,7 +748,7 @@ export default function DashboardChartPreview({
                         background: "var(--color-bg-overlay)",
                         backdropFilter: "blur(8px)",
                       }}
-                      className="px-3 py-2 text-[11px] font-bold border-t border-border-strong whitespace-nowrap text-right text-emerald tabular-nums shadow-[0_-2px_10px_rgba(0,0,0,0.1)] tracking-wide"
+                      className={`px-3 py-2 text-[11px] font-bold border-t border-border-strong whitespace-nowrap text-right tabular-nums shadow-[0_-2px_10px_rgba(0,0,0,0.1)] tracking-wide ${isColoredPivot ? (colTotal > 0 ? "text-emerald drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]" : colTotal < 0 ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)]" : "text-text-secondary") : "text-emerald"}`}
                     >
                       {hasValues
                         ? colTotal.toLocaleString(undefined, {
@@ -715,15 +758,8 @@ export default function DashboardChartPreview({
                     </td>
                   );
                 })}
-                <td
-                  style={{
-                    background: "var(--color-bg-overlay)",
-                    backdropFilter: "blur(8px)",
-                  }}
-                  className="px-3 py-2 text-[11px] font-bold border-t border-l border-border-strong whitespace-nowrap text-right text-emerald tabular-nums bg-emerald/10 shadow-[0_-2px_10px_rgba(0,0,0,0.2)] tracking-wide"
-                >
-                  {rowVals
-                    .reduce((acc, rv) => {
+                {(() => {
+                    const grandTotal = rowVals.reduce((acc, rv) => {
                       const r = String(rv);
                       let rSum = 0;
                       colVals.forEach((cv) => {
@@ -732,9 +768,22 @@ export default function DashboardChartPreview({
                         if (val !== undefined) rSum += val;
                       });
                       return acc + rSum;
-                    }, 0)
-                    .toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </td>
+                    }, 0);
+                    
+                    const colorClass = isColoredPivot ? (grandTotal > 0 ? "text-emerald bg-emerald/10" : grandTotal < 0 ? "text-red-500 bg-red-500/10" : "text-text-secondary bg-bg-muted") : "text-emerald bg-emerald/10";
+                    
+                    return (
+                        <td
+                          style={{
+                            background: "var(--color-bg-overlay)",
+                            backdropFilter: "blur(8px)",
+                          }}
+                          className={`px-3 py-2 text-[11px] font-bold border-t border-l border-border-strong whitespace-nowrap text-right tabular-nums shadow-[0_-2px_10px_rgba(0,0,0,0.2)] tracking-wide ${colorClass}`}
+                        >
+                          {grandTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </td>
+                    );
+                })()}
               </tr>
             </tfoot>
           </table>

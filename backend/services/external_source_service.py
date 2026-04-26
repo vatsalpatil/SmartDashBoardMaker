@@ -108,7 +108,14 @@ def probe_url_source(url: str) -> dict:
         elif fmt == "parquet":
             df = pl.read_parquet(io.BytesIO(sample_bytes), n_rows=200)
         elif fmt == "json":
-            df = pl.read_json(io.BytesIO(sample_bytes))
+            import json as json_lib
+            parsed = json_lib.loads(sample_bytes)
+            if isinstance(parsed, dict) and "data" in parsed and isinstance(parsed["data"], list):
+                df = pl.DataFrame(parsed["data"])
+            elif isinstance(parsed, list):
+                df = pl.DataFrame(parsed)
+            else:
+                df = pl.read_json(io.BytesIO(sample_bytes))
             if df.height > 200:
                 df = df.head(200)
         elif fmt == "excel":
@@ -185,15 +192,19 @@ def load_url_dataset_to_duckdb(dataset_id: str) -> pl.DataFrame:
             raise ValueError(f"Dataset {dataset_id} not found")
 
     d = dict(row)
-    if d.get("file_path") != "URL":
+    if d.get("source_type") != "url":
         raise ValueError(f"Dataset {dataset_id} is not a URL dataset")
 
     meta = json.loads(d.get("source_meta") or "{}")
     url = meta.get("url")
-    fmt = meta.get("format", "csv")
+    fmt = meta.get("format", "csv").lower()
 
     import io
-    req = urllib.request.Request(url, headers={"User-Agent": "SmartDashMaker/1.0"})
+    # Support advanced REST configs if present
+    config = meta.get("config", {})
+    method = config.get("method", "GET")
+    
+    req = urllib.request.Request(url, method=method, headers={"User-Agent": "SmartDashMaker/1.0"})
     with urllib.request.urlopen(req, timeout=60) as resp:
         data = resp.read()
 
@@ -202,7 +213,17 @@ def load_url_dataset_to_duckdb(dataset_id: str) -> pl.DataFrame:
     elif fmt == "parquet":
         df = pl.read_parquet(io.BytesIO(data))
     elif fmt == "json":
-        df = pl.read_json(io.BytesIO(data))
+        import json as json_lib
+        try:
+            parsed = json_lib.loads(data)
+            if isinstance(parsed, dict) and "data" in parsed and isinstance(parsed["data"], list):
+                df = pl.DataFrame(parsed["data"])
+            elif isinstance(parsed, list):
+                df = pl.DataFrame(parsed)
+            else:
+                df = pl.read_json(io.BytesIO(data))
+        except Exception:
+            df = pl.read_json(io.BytesIO(data))
     elif fmt == "excel":
         df = pl.read_excel(io.BytesIO(data), infer_schema_length=10000)
     else:
@@ -224,7 +245,10 @@ def load_url_dataset_to_duckdb(dataset_id: str) -> pl.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def probe_db_connection(db_type: str, host: str, port: int, database: str,
-                        username: str, password: str) -> dict:
+                        username: str, password: str,
+                        ssl_mode: str = "If available", ssl_key: str = "",
+                        ssl_cert: str = "", ssl_ca: str = "", ssl_cipher: str = "",
+                        ssl_key_content: str = "", ssl_cert_content: str = "", ssl_ca_content: str = "") -> dict:
     """
     Test a database connection and list available tables.
     Returns list of tables with basic schema info.
@@ -275,10 +299,33 @@ def probe_db_connection(db_type: str, host: str, port: int, database: str,
                 import psycopg2
             except ImportError:
                 raise ValueError("psycopg2 is not installed. Run: pip install psycopg2-binary")
-            conn = psycopg2.connect(
-                host=host, port=port, dbname=database,
-                user=username, password=password, connect_timeout=10
-            )
+            pg_kwargs = {
+                "host": host, "port": port, "dbname": database,
+                "user": username, "password": password, "connect_timeout": 10
+            }
+            if ssl_mode and ssl_mode.lower() != "disable":
+                import tempfile
+                mode_map = {"require": "require", "verify-ca": "verify-ca", "verify-full": "verify-full"}
+                pg_kwargs["sslmode"] = mode_map.get(ssl_mode.lower(), "prefer")
+                
+                temp_files = []
+                def get_ssl_file(path, content):
+                    if content:
+                        fd, tmp = tempfile.mkstemp()
+                        with os.fdopen(fd, 'w') as f: f.write(content)
+                        temp_files.append(tmp)
+                        return tmp
+                    return path
+                
+                pg_ssl_cert = get_ssl_file(ssl_cert, ssl_cert_content)
+                pg_ssl_key = get_ssl_file(ssl_key, ssl_key_content)
+                pg_ssl_ca = get_ssl_file(ssl_ca, ssl_ca_content)
+                
+                if pg_ssl_cert: pg_kwargs["sslcert"] = pg_ssl_cert
+                if pg_ssl_key: pg_kwargs["sslkey"] = pg_ssl_key
+                if pg_ssl_ca: pg_kwargs["sslrootcert"] = pg_ssl_ca
+            
+            conn = psycopg2.connect(**pg_kwargs)
             cur = conn.cursor()
             cur.execute("""
                 SELECT table_name FROM information_schema.tables
@@ -304,10 +351,31 @@ def probe_db_connection(db_type: str, host: str, port: int, database: str,
                 import mysql.connector
             except ImportError:
                 raise ValueError("mysql-connector-python is not installed. Run: pip install mysql-connector-python")
-            conn = mysql.connector.connect(
-                host=host, port=port, database=database,
-                user=username, password=password, connection_timeout=10
-            )
+            my_kwargs = {
+                "host": host, "port": port, "database": database,
+                "user": username, "password": password, "connection_timeout": 10
+            }
+            if ssl_mode and ssl_mode.lower() != "disable":
+                import tempfile
+                temp_files = []
+                def get_ssl_file(path, content):
+                    if content:
+                        fd, tmp = tempfile.mkstemp()
+                        with os.fdopen(fd, 'w') as f: f.write(content)
+                        temp_files.append(tmp)
+                        return tmp
+                    return path
+                
+                my_ssl_cert = get_ssl_file(ssl_cert, ssl_cert_content)
+                my_ssl_key = get_ssl_file(ssl_key, ssl_key_content)
+                my_ssl_ca = get_ssl_file(ssl_ca, ssl_ca_content)
+                
+                if my_ssl_cert: my_kwargs["ssl_cert"] = my_ssl_cert
+                if my_ssl_key: my_kwargs["ssl_key"] = my_ssl_key
+                if my_ssl_ca: my_kwargs["ssl_ca"] = my_ssl_ca
+                if ssl_cipher: my_kwargs["ssl_cipher"] = ssl_cipher
+            
+            conn = mysql.connector.connect(**my_kwargs)
             cur = conn.cursor()
             cur.execute("SHOW TABLES")
             raw_tables = [r[0] for r in cur.fetchall()]
@@ -329,11 +397,30 @@ def probe_db_connection(db_type: str, host: str, port: int, database: str,
 
 
 def register_db_connection(name: str, db_type: str, host: str, port: int,
-                           database: str, username: str, password: str) -> dict:
+                           database: str, username: str, password: str,
+                           ssl_mode: str = "If available", ssl_key: str = "",
+                           ssl_cert: str = "", ssl_ca: str = "", ssl_cipher: str = "",
+                           ssl_key_content: str = "", ssl_cert_content: str = "", ssl_ca_content: str = "") -> dict:
     """
     Register a database connection. Credentials stored but no data fetched.
     """
     conn_id = str(uuid.uuid4())
+    
+    # Save SSL files locally if content is provided
+    import os
+    ssl_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ssl_certs")
+    os.makedirs(ssl_dir, exist_ok=True)
+    
+    def save_ssl_file(content, suffix):
+        if not content: return ""
+        path = os.path.join(ssl_dir, f"{conn_id}_{suffix}")
+        with open(path, "w") as f: f.write(content)
+        return path
+
+    final_ssl_key = save_ssl_file(ssl_key_content, "key.pem") or ssl_key
+    final_ssl_cert = save_ssl_file(ssl_cert_content, "cert.pem") or ssl_cert
+    final_ssl_ca = save_ssl_file(ssl_ca_content, "ca.pem") or ssl_ca
+
     source_meta = json.dumps({
         "db_type": db_type,
         "host": host,
@@ -341,6 +428,11 @@ def register_db_connection(name: str, db_type: str, host: str, port: int,
         "database": database,
         "username": username,
         "password": password,  # In production, encrypt this
+        "ssl_mode": ssl_mode,
+        "ssl_key": final_ssl_key,
+        "ssl_cert": final_ssl_cert,
+        "ssl_ca": final_ssl_ca,
+        "ssl_cipher": ssl_cipher,
     })
 
     with get_db() as db:
@@ -388,6 +480,7 @@ def get_db_connection(conn_id: str) -> dict:
         if not row:
             raise ValueError(f"Connection {conn_id} not found")
     d = dict(row)
+    meta = json.loads(d.get("source_meta") or "{}")
     return {
         "id": d["id"],
         "name": d["name"],
@@ -397,6 +490,11 @@ def get_db_connection(conn_id: str) -> dict:
         "database": d["database_name"],
         "username": d.get("username", ""),
         "password": d.get("password_enc", ""),  # returned for reconnection
+        "ssl_mode": meta.get("ssl_mode", "If available"),
+        "ssl_key": meta.get("ssl_key", ""),
+        "ssl_cert": meta.get("ssl_cert", ""),
+        "ssl_ca": meta.get("ssl_ca", ""),
+        "ssl_cipher": meta.get("ssl_cipher", ""),
         "created_at": d["created_at"],
     }
 
@@ -494,11 +592,20 @@ def load_db_table_to_duckdb(dataset_id: str) -> pl.DataFrame:
 
     elif db_type == "postgresql":
         import psycopg2
-        pg_conn = psycopg2.connect(
-            host=conn_info["host"], port=conn_info["port"],
-            dbname=conn_info["database"], user=conn_info["username"],
-            password=conn_info["password"]
-        )
+        pg_kwargs = {
+            "host": conn_info["host"], "port": conn_info["port"],
+            "dbname": conn_info["database"], "user": conn_info["username"],
+            "password": conn_info["password"]
+        }
+        ssl_mode = conn_info.get("ssl_mode", "If available")
+        if ssl_mode and ssl_mode.lower() != "disable":
+            mode_map = {"require": "require", "verify-ca": "verify-ca", "verify-full": "verify-full"}
+            pg_kwargs["sslmode"] = mode_map.get(ssl_mode.lower(), "prefer")
+            if conn_info.get("ssl_cert"): pg_kwargs["sslcert"] = conn_info["ssl_cert"]
+            if conn_info.get("ssl_key"): pg_kwargs["sslkey"] = conn_info["ssl_key"]
+            if conn_info.get("ssl_ca"): pg_kwargs["sslrootcert"] = conn_info["ssl_ca"]
+
+        pg_conn = psycopg2.connect(**pg_kwargs)
         cur = pg_conn.cursor()
         cur.execute(f'SELECT * FROM "{table_name}"')
         cols = [desc[0] for desc in cur.description]
@@ -508,11 +615,19 @@ def load_db_table_to_duckdb(dataset_id: str) -> pl.DataFrame:
 
     elif db_type == "mysql":
         import mysql.connector
-        my_conn = mysql.connector.connect(
-            host=conn_info["host"], port=conn_info["port"],
-            database=conn_info["database"], user=conn_info["username"],
-            password=conn_info["password"]
-        )
+        my_kwargs = {
+            "host": conn_info["host"], "port": conn_info["port"],
+            "database": conn_info["database"], "user": conn_info["username"],
+            "password": conn_info["password"]
+        }
+        ssl_mode = conn_info.get("ssl_mode", "If available")
+        if ssl_mode and ssl_mode.lower() != "disable":
+            if conn_info.get("ssl_cert"): my_kwargs["ssl_cert"] = conn_info["ssl_cert"]
+            if conn_info.get("ssl_key"): my_kwargs["ssl_key"] = conn_info["ssl_key"]
+            if conn_info.get("ssl_ca"): my_kwargs["ssl_ca"] = conn_info["ssl_ca"]
+            if conn_info.get("ssl_cipher"): my_kwargs["ssl_cipher"] = conn_info["ssl_cipher"]
+
+        my_conn = mysql.connector.connect(**my_kwargs)
         cur = my_conn.cursor(dictionary=True)
         cur.execute(f"SELECT * FROM `{table_name}`")
         rows = cur.fetchall()
@@ -565,7 +680,9 @@ def refresh_dataset_metadata(dataset_id: str) -> dict:
             conn_info = get_db_connection(meta["connection_id"])
             probe = probe_db_connection(
                 conn_info["db_type"], conn_info["host"], conn_info["port"],
-                conn_info["database"], conn_info["username"], conn_info["password"]
+                conn_info["database"], conn_info["username"], conn_info["password"],
+                conn_info.get("ssl_mode", "If available"), conn_info.get("ssl_key", ""), 
+                conn_info.get("ssl_cert", ""), conn_info.get("ssl_ca", ""), conn_info.get("ssl_cipher", "")
             )
             table_info = next((t for t in probe["tables"] if t["name"] == meta["table_name"]), None)
             if table_info:

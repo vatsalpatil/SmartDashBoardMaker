@@ -69,6 +69,14 @@ class DBConnectionRequest(BaseModel):
     database: str
     username: Optional[str] = ""
     password: Optional[str] = ""
+    ssl_mode: Optional[str] = "If available"
+    ssl_key: Optional[str] = ""
+    ssl_cert: Optional[str] = ""
+    ssl_ca: Optional[str] = ""
+    ssl_cipher: Optional[str] = ""
+    ssl_key_content: Optional[str] = ""
+    ssl_cert_content: Optional[str] = ""
+    ssl_ca_content: Optional[str] = ""
 
 
 class ProbeDBRequest(BaseModel):
@@ -78,6 +86,14 @@ class ProbeDBRequest(BaseModel):
     database: str
     username: Optional[str] = ""
     password: Optional[str] = ""
+    ssl_mode: Optional[str] = "If available"
+    ssl_key: Optional[str] = ""
+    ssl_cert: Optional[str] = ""
+    ssl_ca: Optional[str] = ""
+    ssl_cipher: Optional[str] = ""
+    ssl_key_content: Optional[str] = ""
+    ssl_cert_content: Optional[str] = ""
+    ssl_ca_content: Optional[str] = ""
 
 
 @router.post("/db/probe")
@@ -86,7 +102,9 @@ async def probe_db(req: ProbeDBRequest):
     try:
         result = probe_db_connection(
             req.db_type, req.host, req.port,
-            req.database, req.username, req.password
+            req.database, req.username, req.password,
+            req.ssl_mode, req.ssl_key, req.ssl_cert, req.ssl_ca, req.ssl_cipher,
+            req.ssl_key_content, req.ssl_cert_content, req.ssl_ca_content
         )
         return result
     except ValueError as e:
@@ -101,7 +119,9 @@ async def connect_db(req: DBConnectionRequest):
     try:
         result = register_db_connection(
             req.name, req.db_type, req.host, req.port,
-            req.database, req.username, req.password
+            req.database, req.username, req.password,
+            req.ssl_mode, req.ssl_key, req.ssl_cert, req.ssl_ca, req.ssl_cipher,
+            req.ssl_key_content, req.ssl_cert_content, req.ssl_ca_content
         )
         return result
     except ValueError as e:
@@ -143,7 +163,9 @@ async def probe_existing_connection(conn_id: str):
         conn = get_db_connection(conn_id)
         result = probe_db_connection(
             conn["db_type"], conn["host"], conn["port"],
-            conn["database"], conn["username"], conn["password"]
+            conn["database"], conn["username"], conn["password"],
+            conn.get("ssl_mode", "If available"), conn.get("ssl_key", ""), 
+            conn.get("ssl_cert", ""), conn.get("ssl_ca", ""), conn.get("ssl_cipher", "")
         )
         return result
     except ValueError as e:

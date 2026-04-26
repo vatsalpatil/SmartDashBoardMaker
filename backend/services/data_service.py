@@ -2,6 +2,7 @@ import duckdb
 import os
 import re
 import json
+import time
 from typing import Optional, Dict, Any, List
 from models.database import get_db
 
@@ -27,13 +28,21 @@ def resolve_table_reference(dataset_id: str) -> str:
             raise ValueError(f"Dataset {dataset_id} not found")
     
     d = dict(row)
+    source_type = d.get('source_type', 'file')
     file_path = d.get('file_path')
     mtime = os.path.getmtime(file_path) if file_path and os.path.exists(file_path) else 0
+    current_time = time.time()
     
-    # 1. Performance: Use cache if view exists and file hasn't changed
+    # 1. Performance: Use cache if view exists and file hasn't changed.
+    # For external sources (url/db), we use a 2-second TTL so auto-refresh works without hammering.
     cached = _RESOLVED_DATASETS.get(dataset_id)
-    if cached and cached['mtime'] == mtime:
-        return cached['view_name']
+    if cached:
+        if source_type == 'file' and cached.get('mtime') == mtime:
+            return cached['view_name']
+        elif source_type in ['url', 'db']:
+            last_fetch = cached.get('last_fetch', 0)
+            if current_time - last_fetch < 2.0:
+                return cached['view_name']
 
     view_name_uuid = f"dataset_{dataset_id.replace('-', '_')}"
     safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', d.get('name', 'dataset')).lower()
@@ -44,8 +53,8 @@ def resolve_table_reference(dataset_id: str) -> str:
         if safe_name and safe_name != view_name_uuid:
             con.execute(f"CREATE OR REPLACE VIEW \"{safe_name}\" AS {sql_source}")
 
-    # 2. Logic: Prioritize local files (handles API exports, uploads, etc)
-    if file_path and os.path.exists(file_path):
+    # 2. Logic: Prioritize local files ONLY for static datasets
+    if source_type not in ['url', 'db'] and file_path and os.path.exists(file_path):
         # Escape single quotes for SQL
         esc_path = file_path.replace("'", "''")
         if file_path.endswith('.csv'):
@@ -69,7 +78,12 @@ def resolve_table_reference(dataset_id: str) -> str:
             df = load_url_dataset_to_duckdb(dataset_id) if source_type == 'url' else load_db_table_to_duckdb(dataset_id)
             con.register(view_name_uuid, df)
             if safe_name: con.register(safe_name, df)
-            _RESOLVED_DATASETS[dataset_id] = {'view_name': view_name_uuid, 'mtime': 0, 'safe_name': safe_name}
+            _RESOLVED_DATASETS[dataset_id] = {
+                'view_name': view_name_uuid, 
+                'mtime': 0, 
+                'safe_name': safe_name,
+                'last_fetch': time.time()
+            }
             return view_name_uuid
         except Exception as e:
             print(f"Failed to load external source: {e}")
