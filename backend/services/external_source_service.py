@@ -9,6 +9,8 @@ import uuid
 import json
 import urllib.request
 import urllib.parse
+import time
+import io
 from typing import Dict, Optional, List
 from datetime import datetime
 
@@ -66,7 +68,7 @@ def _detect_format_from_content_type(content_type: str) -> Optional[str]:
     return None
 
 
-def probe_url_source(url: str) -> dict:
+def probe_url_source(url: str, method: str = "GET", headers: dict = None, body: str = None) -> dict:
     """
     Probe a URL to detect format, validate compatibility, and extract schema.
     Does NOT store any data. Returns schema + metadata only.
@@ -74,9 +76,19 @@ def probe_url_source(url: str) -> dict:
     # Detect format from URL
     fmt = _detect_format_from_url(url)
 
+    # Prepare request
+    req_headers = {"User-Agent": "SmartDashMaker/1.0"}
+    if headers:
+        req_headers.update(headers)
+    
+    encoded_body = body.encode("utf-8") if body else None
+
     # Try HTTP HEAD then GET (first 512KB) if format not detected
     try:
-        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "SmartDashMaker/1.0"})
+        req = urllib.request.Request(url, method="HEAD" if method == "GET" else method, headers=req_headers)
+        if method != "GET" and encoded_body:
+            req.data = encoded_body
+            
         with urllib.request.urlopen(req, timeout=10) as resp:
             content_type = resp.headers.get("Content-Type", "")
             content_length = resp.headers.get("Content-Length")
@@ -87,14 +99,25 @@ def probe_url_source(url: str) -> dict:
         content_length = None
 
     if not fmt:
-        raise ValueError(
-            f"Could not detect file format from URL. "
-            f"Supported: {', '.join(SUPPORTED_URL_FORMATS.keys())}"
-        )
+        # Fallback detection for common JSON/CSV endpoints without extensions
+        if "json" in url.lower(): fmt = "json"
+        elif "csv" in url.lower(): fmt = "csv"
+        else:
+            raise ValueError(
+                f"Could not detect file format from URL. "
+                f"Supported: {', '.join(SUPPORTED_URL_FORMATS.keys())}"
+            )
 
     # Download a sample to get schema
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "SmartDashMaker/1.0", "Range": "bytes=0-524288"})
+        sample_headers = req_headers.copy()
+        if method == "GET":
+            sample_headers["Range"] = "bytes=0-524288"
+        
+        req = urllib.request.Request(url, method=method, headers=sample_headers)
+        if encoded_body:
+            req.data = encoded_body
+
         with urllib.request.urlopen(req, timeout=30) as resp:
             sample_bytes = resp.read()
     except Exception as e:
@@ -104,7 +127,13 @@ def probe_url_source(url: str) -> dict:
     import io
     try:
         if fmt == "csv":
-            df = pl.read_csv(io.BytesIO(sample_bytes), infer_schema_length=5000, try_parse_dates=True, n_rows=200)
+            df = pl.read_csv(
+                io.BytesIO(sample_bytes), 
+                infer_schema_length=10000, 
+                try_parse_dates=True, 
+                n_rows=500,
+                truncate_ragged_lines=False
+            )
         elif fmt == "parquet":
             df = pl.read_parquet(io.BytesIO(sample_bytes), n_rows=200)
         elif fmt == "json":
@@ -131,19 +160,38 @@ def probe_url_source(url: str) -> dict:
     if df.width == 0:
         raise ValueError("Dataset has no columns - not a valid tabular dataset")
 
+    # Aggressive type inference for Strings that look like numbers
+    for col in df.columns:
+        if df[col].dtype == pl.String:
+            # Try numeric inference
+            try:
+                # Try Int first
+                s_int = df[col].cast(pl.Int64, strict=False)
+                if s_int.null_count() < df[col].null_count() + (len(df) * 0.1): # allow 10% new nulls
+                    df = df.with_columns(s_int.alias(col))
+                    continue
+                # Try Float
+                s_float = df[col].cast(pl.Float64, strict=False)
+                if s_float.null_count() < df[col].null_count() + (len(df) * 0.1):
+                    df = df.with_columns(s_float.alias(col))
+                    continue
+            except:
+                pass
+
     columns = [{"name": col, "dtype": str(df[col].dtype)} for col in df.columns]
     file_size_bytes = int(content_length) if content_length and content_length.isdigit() else len(sample_bytes)
 
     return {
         "format": fmt,
         "columns": columns,
-        "sample_rows": df.head(5).to_dicts(),
+        "sample_rows": df.head(10).to_dicts(),
         "file_size": file_size_bytes,
         "content_type": content_type,
+        "row_count": len(df)
     }
 
 
-def register_url_dataset(url: str, name: str, probe_result: dict) -> dict:
+def register_url_dataset(url: str, name: str, probe_result: dict, user_id: str, config: dict = None) -> dict:
     """
     Register a URL dataset in the metadata DB. No data stored.
     """
@@ -153,20 +201,21 @@ def register_url_dataset(url: str, name: str, probe_result: dict) -> dict:
         "url": url,
         "format": probe_result["format"],
         "content_type": probe_result.get("content_type", ""),
+        "config": config or {}
     })
 
     with get_db() as db:
         db.execute(
             """INSERT INTO datasets
-               (id, name, original_filename, file_path, file_size, row_count, columns,
+               (id, user_id, name, original_filename, file_path, file_size, row_count, columns,
                 source_type, source_meta, is_virtual)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                dataset_id, name,
+                dataset_id, user_id, name,
                 f"[URL:{probe_result['format'].upper()}]",
                 "URL",
                 probe_result.get("file_size", 0),
-                0,  # row_count unknown until full load
+                probe_result.get("row_count", 0),  # Initial estimate from probe chunk
                 columns_json,
                 "url",
                 source_meta,
@@ -184,10 +233,13 @@ def register_url_dataset(url: str, name: str, probe_result: dict) -> dict:
     }
 
 
-def load_url_dataset_to_duckdb(dataset_id: str) -> pl.DataFrame:
+def load_url_dataset_to_duckdb(dataset_id: str, user_id: str = None) -> pl.DataFrame:
     """Lazily load a URL dataset into DuckDB when needed."""
     with get_db() as db:
-        row = db.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,)).fetchone()
+        if user_id:
+            row = db.execute("SELECT * FROM datasets WHERE id = ? AND user_id = ?", (dataset_id, user_id)).fetchone()
+        else:
+            row = db.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,)).fetchone()
         if not row:
             raise ValueError(f"Dataset {dataset_id} not found")
 
@@ -199,12 +251,20 @@ def load_url_dataset_to_duckdb(dataset_id: str) -> pl.DataFrame:
     url = meta.get("url")
     fmt = meta.get("format", "csv").lower()
 
-    import io
     # Support advanced REST configs if present
     config = meta.get("config", {})
     method = config.get("method", "GET")
+    headers = config.get("headers", {})
+    body = config.get("body")
     
-    req = urllib.request.Request(url, method=method, headers={"User-Agent": "SmartDashMaker/1.0"})
+    req_headers = {"User-Agent": "SmartDashMaker/1.0"}
+    if headers:
+        req_headers.update(headers)
+    
+    req = urllib.request.Request(url, method=method, headers=req_headers)
+    if method != "GET" and body:
+        req.data = body.encode("utf-8")
+
     with urllib.request.urlopen(req, timeout=60) as resp:
         data = resp.read()
 
@@ -229,12 +289,34 @@ def load_url_dataset_to_duckdb(dataset_id: str) -> pl.DataFrame:
     else:
         raise ValueError(f"Unsupported format: {fmt}")
 
-    # Update row_count in DB, refresh schema
-    columns = [{"name": col, "dtype": str(df[col].dtype)} for col in df.columns]
+    # Apply column mappings if saved in DB
+    saved_columns = []
+    if d.get("columns"):
+        try:
+            saved_columns = json.loads(d["columns"])
+        except:
+            pass
+
+    if saved_columns:
+        # Filter columns if some were unselected
+        # Map source -> alias
+        mapping = {c["name"]: c.get("alias") or c["name"] for c in saved_columns}
+        selected = [c["name"] for c in saved_columns]
+        
+        # Select only what's in our mapping (if they exist in DF)
+        available = [c for c in selected if c in df.columns]
+        if available:
+            df = df.select(available)
+            # Rename to aliases
+            rename_map = {c: mapping[c] for c in available if mapping[c] != c}
+            if rename_map:
+                df = df.rename(rename_map)
+
+    # Update row_count in DB, but DO NOT overwrite columns (preserve aliases)
     with get_db() as db:
         db.execute(
-            "UPDATE datasets SET row_count = ?, columns = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (len(df), json.dumps(columns), dataset_id)
+            "UPDATE datasets SET row_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (len(df), dataset_id)
         )
 
     return df
@@ -400,7 +482,7 @@ def register_db_connection(name: str, db_type: str, host: str, port: int,
                            database: str, username: str, password: str,
                            ssl_mode: str = "If available", ssl_key: str = "",
                            ssl_cert: str = "", ssl_ca: str = "", ssl_cipher: str = "",
-                           ssl_key_content: str = "", ssl_cert_content: str = "", ssl_ca_content: str = "") -> dict:
+                           ssl_key_content: str = "", ssl_cert_content: str = "", ssl_ca_content: str = "", user_id: str = None) -> dict:
     """
     Register a database connection. Credentials stored but no data fetched.
     """
@@ -438,9 +520,9 @@ def register_db_connection(name: str, db_type: str, host: str, port: int,
     with get_db() as db:
         db.execute(
             """INSERT INTO db_connections
-               (id, name, db_type, host, port, database_name, username, password_enc, source_meta)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (conn_id, name, db_type, host or "", port or 0,
+               (id, user_id, name, db_type, host, port, database_name, username, password_enc, source_meta)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (conn_id, user_id, name, db_type, host or "", port or 0,
              database, username or "", password, source_meta)
         )
 
@@ -454,9 +536,9 @@ def register_db_connection(name: str, db_type: str, host: str, port: int,
     }
 
 
-def list_db_connections() -> list:
+def list_db_connections(user_id: str) -> list:
     with get_db() as db:
-        rows = db.execute("SELECT * FROM db_connections ORDER BY created_at DESC").fetchall()
+        rows = db.execute("SELECT * FROM db_connections WHERE user_id = ? ORDER BY created_at DESC", (user_id,)).fetchall()
     results = []
     for row in rows:
         d = dict(row)
@@ -474,9 +556,12 @@ def list_db_connections() -> list:
     return results
 
 
-def get_db_connection(conn_id: str) -> dict:
+def get_db_connection(conn_id: str, user_id: str = None) -> dict:
     with get_db() as db:
-        row = db.execute("SELECT * FROM db_connections WHERE id = ?", (conn_id,)).fetchone()
+        if user_id:
+            row = db.execute("SELECT * FROM db_connections WHERE id = ? AND user_id = ?", (conn_id, user_id)).fetchone()
+        else:
+            row = db.execute("SELECT * FROM db_connections WHERE id = ?", (conn_id,)).fetchone()
         if not row:
             raise ValueError(f"Connection {conn_id} not found")
     d = dict(row)
@@ -499,9 +584,12 @@ def get_db_connection(conn_id: str) -> dict:
     }
 
 
-def delete_db_connection(conn_id: str):
+def delete_db_connection(conn_id: str, user_id: str = None):
     with get_db() as db:
-        row = db.execute("SELECT id FROM db_connections WHERE id = ?", (conn_id,)).fetchone()
+        if user_id:
+            row = db.execute("SELECT id FROM db_connections WHERE id = ? AND user_id = ?", (conn_id, user_id)).fetchone()
+        else:
+            row = db.execute("SELECT id FROM db_connections WHERE id = ?", (conn_id,)).fetchone()
         if not row:
             raise ValueError(f"Connection {conn_id} not found")
         # Also delete associated datasets
@@ -510,7 +598,7 @@ def delete_db_connection(conn_id: str):
 
 
 def register_db_table_as_dataset(connection_id: str, table_name: str,
-                                  dataset_name: str, columns: list, row_count: int) -> dict:
+                                  dataset_name: str, columns: list, row_count: int, user_id: str) -> dict:
     """Register a specific DB table as a dataset object (no data stored)."""
     dataset_id = str(uuid.uuid4())
     source_meta = json.dumps({
@@ -526,11 +614,11 @@ def register_db_table_as_dataset(connection_id: str, table_name: str,
 
         db.execute(
             """INSERT INTO datasets
-               (id, name, original_filename, file_path, file_size, row_count, columns,
+               (id, user_id, name, original_filename, file_path, file_size, row_count, columns,
                 source_type, source_meta, is_virtual)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                dataset_id, dataset_name,
+                dataset_id, user_id, dataset_name,
                 f"[DB:{db_type.upper()}:{table_name}]",
                 "DB",
                 0,
@@ -553,10 +641,13 @@ def register_db_table_as_dataset(connection_id: str, table_name: str,
     }
 
 
-def load_db_table_to_duckdb(dataset_id: str) -> pl.DataFrame:
+def load_db_table_to_duckdb(dataset_id: str, user_id: str = None) -> pl.DataFrame:
     """Lazily load a DB table dataset into DuckDB when needed."""
     with get_db() as db:
-        ds_row = db.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,)).fetchone()
+        if user_id:
+            ds_row = db.execute("SELECT * FROM datasets WHERE id = ? AND user_id = ?", (dataset_id, user_id)).fetchone()
+        else:
+            ds_row = db.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,)).fetchone()
         if not ds_row:
             raise ValueError(f"Dataset {dataset_id} not found")
 
@@ -572,69 +663,88 @@ def load_db_table_to_duckdb(dataset_id: str) -> pl.DataFrame:
     db_type = conn_info["db_type"]
 
     df = None
-    if db_type == "sqlite":
-        import sqlite3
-        sqlite_conn = sqlite3.connect(conn_info["database"])
-        sqlite_conn.row_factory = sqlite3.Row
-        cur = sqlite_conn.cursor()
-        cur.execute(f'SELECT * FROM "{table_name}"')
-        rows = cur.fetchall()
-        sqlite_conn.close()
-        if rows:
-            df = pl.from_dicts([dict(r) for r in rows])
-        else:
-            df = pl.DataFrame()
+    max_retries = 3
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            if db_type == "sqlite":
+                import sqlite3
+                sqlite_conn = sqlite3.connect(conn_info["database"])
+                sqlite_conn.row_factory = sqlite3.Row
+                cur = sqlite_conn.cursor()
+                cur.execute(f'SELECT * FROM "{table_name}"')
+                rows = cur.fetchall()
+                sqlite_conn.close()
+                if rows:
+                    df = pl.from_dicts([dict(r) for r in rows])
+                else:
+                    df = pl.DataFrame()
 
-    elif db_type == "duckdb":
-        duck_conn = duckdb.connect(conn_info["database"])
-        df = duck_conn.execute(f'SELECT * FROM "{table_name}"').pl()
-        duck_conn.close()
+            elif db_type == "duckdb":
+                duck_conn = duckdb.connect(conn_info["database"])
+                df = duck_conn.execute(f'SELECT * FROM "{table_name}"').pl()
+                duck_conn.close()
 
-    elif db_type == "postgresql":
-        import psycopg2
-        pg_kwargs = {
-            "host": conn_info["host"], "port": conn_info["port"],
-            "dbname": conn_info["database"], "user": conn_info["username"],
-            "password": conn_info["password"]
-        }
-        ssl_mode = conn_info.get("ssl_mode", "If available")
-        if ssl_mode and ssl_mode.lower() != "disable":
-            mode_map = {"require": "require", "verify-ca": "verify-ca", "verify-full": "verify-full"}
-            pg_kwargs["sslmode"] = mode_map.get(ssl_mode.lower(), "prefer")
-            if conn_info.get("ssl_cert"): pg_kwargs["sslcert"] = conn_info["ssl_cert"]
-            if conn_info.get("ssl_key"): pg_kwargs["sslkey"] = conn_info["ssl_key"]
-            if conn_info.get("ssl_ca"): pg_kwargs["sslrootcert"] = conn_info["ssl_ca"]
+            elif db_type == "postgresql":
+                import psycopg2
+                pg_kwargs = {
+                    "host": conn_info["host"], "port": conn_info["port"],
+                    "dbname": conn_info["database"], "user": conn_info["username"],
+                    "password": conn_info["password"], "connect_timeout": 10
+                }
+                ssl_mode = conn_info.get("ssl_mode", "If available")
+                if ssl_mode and ssl_mode.lower() != "disable":
+                    mode_map = {"require": "require", "verify-ca": "verify-ca", "verify-full": "verify-full"}
+                    pg_kwargs["sslmode"] = mode_map.get(ssl_mode.lower(), "prefer")
+                    if conn_info.get("ssl_cert"): pg_kwargs["sslcert"] = conn_info["ssl_cert"]
+                    if conn_info.get("ssl_key"): pg_kwargs["sslkey"] = conn_info["ssl_key"]
+                    if conn_info.get("ssl_ca"): pg_kwargs["sslrootcert"] = conn_info["ssl_ca"]
 
-        pg_conn = psycopg2.connect(**pg_kwargs)
-        cur = pg_conn.cursor()
-        cur.execute(f'SELECT * FROM "{table_name}"')
-        cols = [desc[0] for desc in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
-        pg_conn.close()
-        df = pl.from_dicts(rows) if rows else pl.DataFrame(schema={c: pl.Utf8 for c in cols})
+                pg_conn = psycopg2.connect(**pg_kwargs)
+                cur = pg_conn.cursor()
+                cur.execute(f'SELECT * FROM "{table_name}"')
+                cols = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+                pg_conn.close()
+                df = pl.DataFrame(rows, schema=cols, orient="row") if rows else pl.DataFrame(schema={c: pl.Utf8 for c in cols})
 
-    elif db_type == "mysql":
-        import mysql.connector
-        my_kwargs = {
-            "host": conn_info["host"], "port": conn_info["port"],
-            "database": conn_info["database"], "user": conn_info["username"],
-            "password": conn_info["password"]
-        }
-        ssl_mode = conn_info.get("ssl_mode", "If available")
-        if ssl_mode and ssl_mode.lower() != "disable":
-            if conn_info.get("ssl_cert"): my_kwargs["ssl_cert"] = conn_info["ssl_cert"]
-            if conn_info.get("ssl_key"): my_kwargs["ssl_key"] = conn_info["ssl_key"]
-            if conn_info.get("ssl_ca"): my_kwargs["ssl_ca"] = conn_info["ssl_ca"]
-            if conn_info.get("ssl_cipher"): my_kwargs["ssl_cipher"] = conn_info["ssl_cipher"]
+            elif db_type == "mysql":
+                import mysql.connector
+                my_kwargs = {
+                    "host": conn_info["host"], "port": conn_info["port"],
+                    "database": conn_info["database"], "user": conn_info["username"],
+                    "password": conn_info["password"], "connection_timeout": 10
+                }
+                ssl_mode = conn_info.get("ssl_mode", "If available")
+                if ssl_mode and ssl_mode.lower() != "disable":
+                    if conn_info.get("ssl_cert"): my_kwargs["ssl_cert"] = conn_info["ssl_cert"]
+                    if conn_info.get("ssl_key"): my_kwargs["ssl_key"] = conn_info["ssl_key"]
+                    if conn_info.get("ssl_ca"): my_kwargs["ssl_ca"] = conn_info["ssl_ca"]
+                    if conn_info.get("ssl_cipher"): my_kwargs["ssl_cipher"] = conn_info["ssl_cipher"]
 
-        my_conn = mysql.connector.connect(**my_kwargs)
-        cur = my_conn.cursor(dictionary=True)
-        cur.execute(f"SELECT * FROM `{table_name}`")
-        rows = cur.fetchall()
-        my_conn.close()
-        df = pl.from_dicts(rows) if rows else pl.DataFrame()
-    else:
-        raise ValueError(f"Unsupported db type: {db_type}")
+                my_conn = mysql.connector.connect(**my_kwargs)
+                cur = my_conn.cursor()
+                cur.execute(f"SELECT * FROM `{table_name}`")
+                cols = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+                my_conn.close()
+                df = pl.DataFrame(rows, schema=cols, orient="row") if rows else pl.DataFrame(schema={c: pl.Utf8 for c in cols})
+            else:
+                raise ValueError(f"Unsupported db type: {db_type}")
+            
+            # If we reached here, success!
+            break
+            
+        except Exception as e:
+            last_error = e
+            print(f"Attempt {attempt + 1} failed for {db_type}: {e}")
+            if attempt < max_retries - 1:
+                # Exponential backoff: 2s, 5s
+                wait = 2 if attempt == 0 else 5
+                time.sleep(wait)
+            else:
+                raise Exception(f"Database load failed after {max_retries} attempts. Last error: {str(last_error)}")
 
     # Update metadata
     columns = [{"name": col, "dtype": str(df[col].dtype)} for col in df.columns]
@@ -647,13 +757,13 @@ def load_db_table_to_duckdb(dataset_id: str) -> pl.DataFrame:
     return df
 
 
-def refresh_dataset_metadata(dataset_id: str) -> dict:
+def refresh_dataset_metadata(dataset_id: str, user_id: str) -> dict:
     """
     Re-fetch schema and row count for external datasets (URL / DB).
     Called when user selects dataset or clicks refresh.
     """
     with get_db() as db:
-        row = db.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,)).fetchone()
+        row = db.execute("SELECT * FROM datasets WHERE id = ? AND user_id = ?", (dataset_id, user_id)).fetchone()
         if not row:
             raise ValueError(f"Dataset {dataset_id} not found")
 
@@ -696,3 +806,81 @@ def refresh_dataset_metadata(dataset_id: str) -> dict:
             return {"status": "error", "message": str(e)}
 
     return {"status": "skipped", "reason": "Not an external source"}
+
+
+def check_db_active(dataset_id: str, user_id: str) -> dict:
+    """
+    Check if the database associated with a dataset is active.
+    This is useful for serverless databases that might be sleeping.
+    """
+    with get_db() as db:
+        ds_row = db.execute("SELECT source_type, source_meta FROM datasets WHERE id = ? AND user_id = ?", (dataset_id, user_id)).fetchone()
+        if not ds_row:
+            raise ValueError("Dataset not found")
+        
+        ds = dict(ds_row)
+        if ds["source_type"] != "db":
+            return {"active": True, "message": "Not a database source", "type": ds["source_type"]}
+        
+        meta = json.loads(ds["source_meta"] or "{}")
+        conn_id = meta.get("connection_id")
+        if not conn_id:
+            raise ValueError("Connection ID not found in dataset metadata")
+        
+        conn_info = get_db_connection(conn_id, user_id)
+        db_type = conn_info["db_type"]
+        
+        try:
+            if db_type == "sqlite":
+                import sqlite3
+                c = sqlite3.connect(conn_info["database"], timeout=5)
+                c.execute("SELECT 1")
+                c.close()
+            elif db_type == "duckdb":
+                import duckdb
+                c = duckdb.connect(conn_info["database"])
+                c.execute("SELECT 1")
+                c.close()
+            elif db_type == "postgresql":
+                import psycopg2
+                pg_kwargs = {
+                    "host": conn_info["host"], "port": conn_info["port"],
+                    "dbname": conn_info["database"], "user": conn_info["username"],
+                    "password": conn_info["password"], "connect_timeout": 10
+                }
+                ssl_mode = conn_info.get("ssl_mode", "If available")
+                if ssl_mode and ssl_mode.lower() != "disable":
+                    import tempfile
+                    mode_map = {"require": "require", "verify-ca": "verify-ca", "verify-full": "verify-full"}
+                    pg_kwargs["sslmode"] = mode_map.get(ssl_mode.lower(), "prefer")
+                    if conn_info.get("ssl_cert"): pg_kwargs["sslcert"] = conn_info["ssl_cert"]
+                    if conn_info.get("ssl_key"): pg_kwargs["sslkey"] = conn_info["ssl_key"]
+                    if conn_info.get("ssl_ca"): pg_kwargs["sslrootcert"] = conn_info["ssl_ca"]
+                
+                c = psycopg2.connect(**pg_kwargs)
+                cur = c.cursor()
+                cur.execute("SELECT 1")
+                c.close()
+            elif db_type == "mysql":
+                import mysql.connector
+                my_kwargs = {
+                    "host": conn_info["host"], "port": conn_info["port"],
+                    "database": conn_info["database"], "user": conn_info["username"],
+                    "password": conn_info["password"], "connection_timeout": 10
+                }
+                ssl_mode = conn_info.get("ssl_mode", "If available")
+                if ssl_mode and ssl_mode.lower() != "disable":
+                    if conn_info.get("ssl_cert"): my_kwargs["ssl_cert"] = conn_info["ssl_cert"]
+                    if conn_info.get("ssl_key"): my_kwargs["ssl_key"] = conn_info["ssl_key"]
+                    if conn_info.get("ssl_ca"): my_kwargs["ssl_ca"] = conn_info["ssl_ca"]
+                
+                c = mysql.connector.connect(**my_kwargs)
+                cur = c.cursor()
+                cur.execute("SELECT 1")
+                c.close()
+            else:
+                return {"active": False, "message": f"Unsupported DB type for active check: {db_type}"}
+            
+            return {"active": True, "message": "Database is active and responsive", "db_type": db_type}
+        except Exception as e:
+            return {"active": False, "message": str(e), "db_type": db_type}

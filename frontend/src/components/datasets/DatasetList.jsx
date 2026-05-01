@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Database, Trash2, Table2, ArrowRight } from "lucide-react";
-import { listDatasets, deleteDataset } from "../../lib/api";
+import { Database, Trash2, Table2, ArrowRight, RefreshCw, Edit3 } from "lucide-react";
+import { listDatasets, deleteDataset, updateDataset, refreshExternalDataset } from "../../lib/api";
 import { Badge, Button, EmptyState } from "../ui";
 import { SkeletonCard } from "../ui/Skeleton";
 import { useToast } from "../ui/Toast";
 import { useConfirm } from "../ui/ConfirmDialog";
 
-export default function DatasetList({ searchQuery = "", onRefresh }) {
+export default function DatasetList({ searchQuery = "", onRefresh, onEdit }) {
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingIds, setRefreshingIds] = useState(new Set());
   const navigate = useNavigate();
   const toast = useToast();
   const confirm = useConfirm();
@@ -46,6 +47,45 @@ export default function DatasetList({ searchQuery = "", onRefresh }) {
       toast.success(`"${name}" deleted`);
     } catch {
       toast.error("Failed to delete dataset");
+    }
+  };
+
+  const handleRefresh = async (e, id, name) => {
+    e.stopPropagation();
+    setRefreshingIds(prev => new Set(prev).add(id));
+    toast.info(`Refreshing "${name}"...`);
+    try {
+      await refreshExternalDataset(id);
+      await fetchDatasets();
+      toast.success(`"${name}" metadata refreshed`);
+    } catch {
+      toast.error("Failed to refresh dataset");
+    } finally {
+      setRefreshingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
+  const handleEditAction = async (e, ds) => {
+    e.stopPropagation();
+    // Try environment-specific edit first
+    const result = onEdit?.(ds);
+    
+    // Fallback to simple rename if requested or if no specific env exists
+    if (result === "rename" || (!onEdit && ds.source_type === 'file')) {
+      const newName = window.prompt("Enter new dataset name:", ds.name);
+      if (!newName || newName === ds.name) return;
+
+      try {
+        await updateDataset(ds.id, { name: newName });
+        setDatasets((all) => all.map((d) => (d.id === ds.id ? { ...d, name: newName } : d)));
+        toast.success("Dataset renamed");
+      } catch {
+        toast.error("Failed to rename dataset");
+      }
     }
   };
 
@@ -162,6 +202,30 @@ export default function DatasetList({ searchQuery = "", onRefresh }) {
 
                 <td className="py-5 px-8 text-right align-middle">
                   <div className="flex items-center justify-end gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                    {/* Refresh (only for external) */}
+                    {(ds.source_type === "url" || ds.source_type === "db") && (
+                      <button
+                        className="w-9 h-9 rounded-xl bg-bg-muted text-text-tertiary hover:text-emerald hover:bg-emerald-muted transition-all flex items-center justify-center border border-border-muted"
+                        onClick={(e) => handleRefresh(e, ds.id, ds.name)}
+                        title="Refresh metadata"
+                        disabled={refreshingIds.has(ds.id)}
+                      >
+                        <RefreshCw 
+                          size={16} 
+                          className={refreshingIds.has(ds.id) ? "animate-spin text-emerald" : ""} 
+                        />
+                      </button>
+                    )}
+
+                    {/* Edit/Rename */}
+                    <button
+                      className="w-9 h-9 rounded-xl bg-bg-muted text-text-tertiary hover:text-violet hover:bg-violet-muted transition-all flex items-center justify-center border border-border-muted"
+                      onClick={(e) => handleEditAction(e, ds)}
+                      title="Edit dataset"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+
                     <button
                       className="w-9 h-9 rounded-xl bg-bg-muted text-text-tertiary hover:text-accent hover:bg-accent-muted transition-all flex items-center justify-center border border-border-muted"
                       onClick={(e) => {

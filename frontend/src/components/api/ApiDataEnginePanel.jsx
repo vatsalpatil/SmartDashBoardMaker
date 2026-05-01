@@ -71,7 +71,7 @@ const STEPS = [
   { id: 3, label: "Live Transform & Preview", icon: SlidersHorizontal },
 ];
 
-export default function ApiDataEnginePanel() {
+export default function ApiDataEnginePanel({ initialDatasetId }) {
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -108,7 +108,7 @@ export default function ApiDataEnginePanel() {
   const [savedApis, setSavedApis] = useState([]);
   const [showSaved, setShowSaved] = useState(false);
   const [savedApiSearch, setSavedApiSearch] = useState("");
-  const [existingId, setExistingId] = useState(null);
+  const [existingId, setExistingId] = useState(initialDatasetId || null);
 
   // -- Data Extraction & Schema State --
   const [dataPath, setDataPath] = useState("");
@@ -127,6 +127,31 @@ export default function ApiDataEnginePanel() {
       setPreviewData(applyTransforms(srcRows, cols, filters, sort, filterLogic));
     }
   }, [srcRows, cols, filters, sort, filterLogic, step]);
+
+  // Load initial dataset if provided
+  useEffect(() => {
+    if (initialDatasetId) {
+      const loadInitial = async () => {
+        try {
+          const { getDataset } = await import("../../lib/api");
+          const ds = await getDataset(initialDatasetId);
+          if (ds.source_type === "url" && ds.source_meta) {
+            const meta = typeof ds.source_meta === "string" ? JSON.parse(ds.source_meta) : ds.source_meta;
+            if (meta.config) {
+              setCfg(meta.config);
+              if (meta.dataPath) setDataPath(meta.dataPath);
+              setExistingId(initialDatasetId);
+              // Trigger initial fetch in next tick
+              setTimeout(() => fetchApi(), 100);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load initial dataset", e);
+        }
+      };
+      loadInitial();
+    }
+  }, [initialDatasetId]);
 
   const updateConfig = (patch) => setCfg((c) => ({ ...c, ...patch }));
 
@@ -153,11 +178,16 @@ export default function ApiDataEnginePanel() {
       if (cfg.authType === "Basic Auth" && cfg.basicUser) hh["Authorization"] = "Basic " + btoa(`${cfg.basicUser}:${cfg.basicPass}`);
 
       let res;
+      const token = localStorage.getItem("access_token");
+      
       if (useProxy) {
+        const proxyHeaders = { "Content-Type": "application/json" };
+        if (token) proxyHeaders["Authorization"] = `Bearer ${token}`;
+        
         const bodyStr = (["POST", "PUT", "PATCH"].includes(cfg.method) && cfg.body) ? cfg.body : null;
         res = await fetch("http://localhost:8000/api/proxy", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: proxyHeaders,
           body: JSON.stringify({ url, method: cfg.method, headers: hh, body: bodyStr }),
         });
       } else {
@@ -261,7 +291,7 @@ export default function ApiDataEnginePanel() {
       ];
       const blob = new Blob([csvLines.join("\n")], { type: "text/csv" });
       const file = new File([blob], `${cfg.name || "API_Dataset"}_${Date.now()}.csv`, { type: "text/csv" });
-      const res = await uploadDataset(file, cfg.name || "API Data Export", "url", { format: "JSON", url: cfg.url, config: cfg }, existingId);
+      const res = await uploadDataset(file, cfg.name || "API Data Export", "url", { format: "JSON", url: cfg.url, config: cfg, dataPath: dataPath }, existingId);
       setExistingId(res.id);
       toast.success(existingId ? "Dataset updated successfully!" : "Dataset saved successfully!");
       // Optionally stay on page or navigate

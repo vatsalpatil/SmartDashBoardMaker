@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Dict, Optional
+from auth.dependencies import get_current_user
 import urllib.request
 import urllib.error
 
@@ -14,7 +15,7 @@ class ProxyRequest(BaseModel):
     body: Optional[str] = None
 
 @router.post("")
-async def execute_proxy(req: ProxyRequest):
+async def execute_proxy(req: ProxyRequest, current_user: dict = Depends(get_current_user)):
     try:
         headers = req.headers or {}
         # Many public APIs (like NSE) reject requests without a valid User-Agent

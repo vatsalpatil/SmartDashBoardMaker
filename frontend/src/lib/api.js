@@ -5,6 +5,80 @@ const api = axios.create({
   timeout: 120000, // 2 min for large queries
 });
 
+// ── Request interceptor: attach Bearer token ──────────────────────────────────
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// ── Response interceptor: auto-refresh on 401 ─────────────────────────────────
+let _refreshing = false;
+let _waitQueue = [];
+
+const processQueue = (token) => {
+  _waitQueue.forEach((cb) => cb(token));
+  _waitQueue = [];
+};
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const original = error.config;
+    const is401 = error.response?.status === 401;
+    const isAuthRoute = original.url?.startsWith('/auth/');
+
+    if (!is401 || isAuthRoute || original._retry) {
+      return Promise.reject(error);
+    }
+
+    original._retry = true;
+    const refreshToken = localStorage.getItem('refresh_token');
+
+    if (!refreshToken) {
+      localStorage.removeItem('access_token');
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
+    if (_refreshing) {
+      // Queue calls that come in while a refresh is in flight
+      return new Promise((resolve, reject) => {
+        _waitQueue.push((token) => {
+          if (token) {
+            original.headers.Authorization = `Bearer ${token}`;
+            resolve(api(original));
+          } else {
+            reject(error);
+          }
+        });
+      });
+    }
+
+    _refreshing = true;
+    try {
+      const { data } = await axios.post('/api/auth/refresh', {
+        refresh_token: refreshToken,
+      });
+      const newToken = data.access_token;
+      localStorage.setItem('access_token', newToken);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+      original.headers.Authorization = `Bearer ${newToken}`;
+      processQueue(newToken);
+      return api(original);
+    } catch {
+      processQueue(null);
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      window.location.href = '/login';
+      return Promise.reject(error);
+    } finally {
+      _refreshing = false;
+    }
+  }
+);
+
 // ── Datasets ──────────────────────────────────────────────
 export const uploadDataset = async (file, name, sourceType = null, sourceMeta = null, existingId = null) => {
   const formData = new FormData();
@@ -21,7 +95,7 @@ export const uploadDataset = async (file, name, sourceType = null, sourceMeta = 
 };
 
 export const listDatasets = async () => {
-  const { data } = await api.get('/datasets');
+  const { data } = await api.get('/datasets/');
   return data;
 };
 
@@ -42,14 +116,19 @@ export const deleteDataset = async (id) => {
   return data;
 };
 
-// ── External Sources ──────────────────────────────────────────────────────────
-export const probeUrl = async (url) => {
-  const { data } = await api.post('/external/url/probe', { url });
+export const updateDataset = async (id, payload) => {
+  const { data } = await api.patch(`/datasets/${id}`, payload);
   return data;
 };
 
-export const registerUrlDataset = async (url, name) => {
-  const { data } = await api.post('/external/url/register', { url, name });
+// ── External Sources ──────────────────────────────────────────────────────────
+export const probeUrl = async (url, options = {}) => {
+  const { data } = await api.post('/external/url/probe', { url, ...options });
+  return data;
+};
+
+export const registerUrlDataset = async (url, name, options = {}) => {
+  const { data } = await api.post('/external/url/register', { url, name, ...options });
   return data;
 };
 
@@ -64,7 +143,7 @@ export const saveDbConnection = async (params) => {
 };
 
 export const listDbConnections = async () => {
-  const { data } = await api.get('/external/db/connections');
+  const { data } = await api.get('/external/db/connections/');
   return data;
 };
 
@@ -85,6 +164,11 @@ export const registerDbTable = async (payload) => {
 
 export const refreshExternalDataset = async (id) => {
   const { data } = await api.post(`/external/refresh/${id}`);
+  return data;
+};
+
+export const checkDbActive = async (id) => {
+  const { data } = await api.get(`/external/db/active-check/${id}`);
   return data;
 };
 
@@ -115,7 +199,7 @@ export const saveQueryAsDataset = async (name, sql, datasetId) => {
 
 export const listSavedQueries = async (datasetId) => {
   const params = datasetId ? { dataset_id: datasetId } : {};
-  const { data } = await api.get('/queries', { params });
+  const { data } = await api.get('/queries/', { params });
   return data;
 };
 
@@ -164,13 +248,13 @@ export const getColumnStats = async (datasetId, tableName, column) => {
 
 // ── Visualizations ────────────────────────────────────────
 export const createVisualization = async (payload) => {
-  const { data } = await api.post('/visualizations', payload);
+  const { data } = await api.post('/visualizations/', payload);
   return data;
 };
 
 export const listVisualizations = async (datasetId) => {
   const params = datasetId ? { dataset_id: datasetId } : {};
-  const { data } = await api.get('/visualizations', { params });
+  const { data } = await api.get('/visualizations/', { params });
   return data;
 };
 
@@ -191,12 +275,12 @@ export const deleteVisualization = async (id) => {
 
 // ── Dashboards ────────────────────────────────────────────
 export const createDashboard = async (payload) => {
-  const { data } = await api.post('/dashboards', payload);
+  const { data } = await api.post('/dashboards/', payload);
   return data;
 };
 
 export const listDashboards = async () => {
-  const { data } = await api.get('/dashboards');
+  const { data } = await api.get('/dashboards/');
   return data;
 };
 

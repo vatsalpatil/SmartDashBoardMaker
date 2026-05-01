@@ -1,4 +1,11 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi.responses import FileResponse
+from typing import List, Optional
+from pydantic import BaseModel
+from models.database import get_db
+from auth.dependencies import get_current_user
+import uuid
+import os
 from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel
@@ -16,27 +23,27 @@ class QueryBase(BaseModel):
     config: Optional[str] = "{}"
 
 @router.get("/")
-async def list_queries(dataset_id: Optional[str] = None):
+def list_queries(dataset_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         if dataset_id:
-            cursor = conn.execute("SELECT * FROM saved_queries WHERE dataset_id = ?", (dataset_id,))
+            cursor = conn.execute("SELECT * FROM saved_queries WHERE dataset_id = ? AND user_id = ?", (dataset_id, current_user["id"]))
         else:
-            cursor = conn.execute("SELECT * FROM saved_queries ORDER BY created_at DESC")
+            cursor = conn.execute("SELECT * FROM saved_queries WHERE user_id = ? ORDER BY created_at DESC", (current_user["id"],))
         return {"queries": [dict(row) for row in cursor.fetchall()]}
 
 @router.post("/save")
-async def save_query(query: QueryBase):
+def save_query(query: QueryBase, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         # 1. Try to find existing by ID
         existing_id = None
         if hasattr(query, 'id') and query.id:
-            cursor = conn.execute("SELECT id FROM saved_queries WHERE id = ?", (query.id,))
+            cursor = conn.execute("SELECT id FROM saved_queries WHERE id = ? AND user_id = ?", (query.id, current_user["id"]))
             row = cursor.fetchone()
             if row: existing_id = row['id']
             
         # 2. Try to find existing by Name if no ID match
         if not existing_id:
-            cursor = conn.execute("SELECT id FROM saved_queries WHERE name = ?", (query.name,))
+            cursor = conn.execute("SELECT id FROM saved_queries WHERE name = ? AND user_id = ?", (query.name, current_user["id"]))
             row = cursor.fetchone()
             if row: existing_id = row['id']
 
@@ -44,16 +51,16 @@ async def save_query(query: QueryBase):
             conn.execute("""
                 UPDATE saved_queries 
                 SET name = ?, description = ?, sql_text = ?, dataset_id = ?, config = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (query.name, query.description, query.sql_text, query.dataset_id, query.config, existing_id))
+                WHERE id = ? AND user_id = ?
+            """, (query.name, query.description, query.sql_text, query.dataset_id, query.config, existing_id, current_user["id"]))
             return {"id": existing_id, **query.dict()}
                 
         # 3. Create new if no match
         new_id = getattr(query, 'id', None) or str(uuid.uuid4())
         conn.execute("""
-            INSERT INTO saved_queries (id, name, description, sql_text, dataset_id, config)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (new_id, query.name, query.description, query.sql_text, query.dataset_id, query.config))
+            INSERT INTO saved_queries (id, user_id, name, description, sql_text, dataset_id, config)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (new_id, current_user["id"], query.name, query.description, query.sql_text, query.dataset_id, query.config))
         return {"id": new_id, **query.dict()}
 
 class SaveDatasetRequest(BaseModel):
@@ -62,28 +69,28 @@ class SaveDatasetRequest(BaseModel):
     dataset_id: str
 
 @router.post("/save_dataset")
-async def save_query_as_dataset(req: SaveDatasetRequest):
+def save_query_as_dataset(req: SaveDatasetRequest, current_user: dict = Depends(get_current_user)):
     new_dataset_id = str(uuid.uuid4())
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO datasets (id, name, original_filename, file_path, row_count, columns, is_virtual, parent_dataset_id, sql_query, source_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (new_dataset_id, req.name, req.name, "", 0, "[]", 1, req.dataset_id, req.sql, 'query'))
+            INSERT INTO datasets (id, user_id, name, original_filename, file_path, row_count, columns, is_virtual, parent_dataset_id, sql_query, source_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (new_dataset_id, current_user["id"], req.name, req.name, "", 0, "[]", 1, req.dataset_id, req.sql, 'query'))
         return {"dataset_id": new_dataset_id}
 
 @router.get("/{query_id}")
-async def get_query(query_id: str):
+def get_query(query_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM saved_queries WHERE id = ?", (query_id,))
+        cursor = conn.execute("SELECT * FROM saved_queries WHERE id = ? AND user_id = ?", (query_id, current_user["id"]))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Query not found")
         return dict(row)
 
 @router.delete("/{query_id}")
-async def delete_query(query_id: str):
+def delete_query(query_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        conn.execute("DELETE FROM saved_queries WHERE id = ?", (query_id,))
+        conn.execute("DELETE FROM saved_queries WHERE id = ? AND user_id = ?", (query_id, current_user["id"]))
         return {"status": "success"}
 
 class ExecuteRequest(BaseModel):
@@ -93,7 +100,7 @@ class ExecuteRequest(BaseModel):
     page_size: Optional[int] = 100
 
 @router.post("/execute")
-async def execute_query_endpoint(req: ExecuteRequest):
+def execute_query_endpoint(req: ExecuteRequest, current_user: dict = Depends(get_current_user)):
     from services.data_service import execute_query_duckdb
     try:
         # Paging for big results
@@ -123,18 +130,18 @@ async def execute_query_endpoint(req: ExecuteRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/validate")
-async def validate_query_endpoint(req: ExecuteRequest):
+def validate_query_endpoint(req: ExecuteRequest, current_user: dict = Depends(get_current_user)):
     from services.data_service import execute_query_duckdb
     try:
         # Just try to explain or run with limit 0
         check_sql = f"SELECT * FROM ({req.sql.strip().rstrip(';')}) AS q LIMIT 0"
-        execute_query_duckdb(check_sql, req.dataset_id)
+        execute_query_duckdb(check_sql, req.dataset_id, skip_refresh=True)
         return {"valid": True}
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
 @router.post("/export")
-async def export_query(req: ExecuteRequest, background_tasks: BackgroundTasks):
+def export_query(req: ExecuteRequest, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     from services.data_service import export_query_to_csv
     try:
         tmp_path = export_query_to_csv(req.sql, req.dataset_id)

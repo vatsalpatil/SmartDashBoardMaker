@@ -13,8 +13,12 @@ import {
   HardDrive,
   ChevronRight,
   ExternalLink,
+  Activity,
+  Zap,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
-import { getDataset, deleteDataset } from "../lib/api";
+import { getDataset, deleteDataset, checkDbActive } from "../lib/api";
 import DataPreview from "../components/datasets/DataPreview";
 
 export default function DatasetDetailPage() {
@@ -22,16 +26,36 @@ export default function DatasetDetailPage() {
   const navigate = useNavigate();
   const [dataset, setDataset] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dbStatus, setDbStatus] = useState({ checking: false, active: null, message: "" });
 
   useEffect(() => {
     getDataset(id)
-      .then(setDataset)
+      .then((data) => {
+        setDataset(data);
+        if (data.source_type === "db") {
+          checkStatus(id);
+        }
+      })
       .catch((err) => {
         console.error("Failed to load dataset:", err);
         navigate("/");
       })
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  const checkStatus = async (datasetId) => {
+    setDbStatus((prev) => ({ ...prev, checking: true }));
+    try {
+      const res = await checkDbActive(datasetId || id);
+      setDbStatus({ checking: false, active: res.active, message: res.message });
+    } catch (err) {
+      setDbStatus({
+        checking: false,
+        active: false,
+        message: err.response?.data?.detail || "Connection failed",
+      });
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm("Delete this dataset? This cannot be undone.")) return;
@@ -225,6 +249,71 @@ export default function DatasetDetailPage() {
                 </div>
               </div>
             </section>
+
+            {dataset.source_type === "db" && (
+              <section className="bg-bg-surface border border-border-default rounded-2xl p-4 flex flex-col gap-3 shadow-sm relative overflow-hidden group">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10px] font-black text-text-quaternary uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={12} className="text-accent" />
+                    Database Health
+                  </h4>
+                  <button
+                    onClick={() => checkStatus()}
+                    disabled={dbStatus.checking}
+                    className={`p-1.5 rounded-lg border border-border-muted hover:bg-bg-raised transition-all ${
+                      dbStatus.checking ? "animate-spin opacity-50" : "hover:text-accent"
+                    }`}
+                    title="Check status / Wake up DB"
+                  >
+                    <RefreshCw size={12} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                    dbStatus.checking 
+                      ? "bg-bg-raised border-border-muted animate-pulse" 
+                      : dbStatus.active 
+                        ? "bg-emerald/5 border-emerald/20" 
+                        : dbStatus.active === false
+                          ? "bg-rose/5 border-rose/20"
+                          : "bg-bg-raised border-border-muted"
+                  }`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      dbStatus.checking 
+                        ? "bg-text-quaternary/10 text-text-quaternary" 
+                        : dbStatus.active 
+                          ? "bg-emerald/20 text-emerald" 
+                          : dbStatus.active === false
+                            ? "bg-rose/20 text-rose"
+                            : "bg-text-quaternary/10 text-text-quaternary"
+                    }`}>
+                      {dbStatus.checking ? (
+                         <RefreshCw size={14} className="animate-spin" />
+                      ) : dbStatus.active ? (
+                        <Zap size={14} />
+                      ) : (
+                        <AlertCircle size={14} />
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] font-bold text-text-primary">
+                        {dbStatus.checking ? "Checking database..." : dbStatus.active ? "Database Active" : dbStatus.active === false ? "Database Sleeping / Offline" : "Status Unknown"}
+                      </span>
+                      <span className="text-[10px] text-text-tertiary truncate">
+                        {dbStatus.message || (dbStatus.active ? "Ready for queries" : "Click refresh to wake up instance")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {dbStatus.active === false && (
+                    <p className="text-[9px] text-text-quaternary leading-relaxed bg-bg-base/50 p-2 rounded-lg border border-border-muted italic">
+                      Note: Serverless instances may take up to 30 seconds to wake up on the first request after being idle.
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
           </div>
 
           {/* Right Side: Data Preview */}

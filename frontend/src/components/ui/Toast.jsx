@@ -73,13 +73,14 @@ export function ToastProvider({ children }) {
     error: (msg, title) => toast('error', msg, title),
     warning: (msg, title) => toast('warning', msg, title),
     info: (msg, title) => toast('info', msg, title),
+    clear: () => setToasts([]),
   };
 
   return (
     <ToastContext.Provider value={api}>
       {children}
       {createPortal(
-        <div id="toast-root" className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+        <div id="toast-root" className="fixed bottom-4 right-4 z-[9999] flex flex-col-reverse gap-2 pointer-events-none">
           {toasts.map(t => (
             <div key={t.id} className="pointer-events-auto">
               <ToastItem {...t} onRemove={remove} />

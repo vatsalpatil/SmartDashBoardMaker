@@ -17,8 +17,8 @@ const DB_TYPES = [
   { value: 'mysql', label: 'MySQL', icon: '🐬', hasHost: true },
 ];
 
-export default function DbConnectModal({ onClose, onSuccess }) {
-  const [activeTab, setActiveTab] = useState('new'); // 'new' | 'saved'
+export default function DbConnectModal({ onClose, onSuccess, initialDataset }) {
+  const [activeTab, setActiveTab] = useState(initialDataset ? 'saved' : 'new'); // 'new' | 'saved'
   const [dbType, setDbType] = useState('sqlite');
   const [form, setForm] = useState({ 
     host: 'localhost', port: '', database: '', username: '', password: '', name: '',
@@ -42,6 +42,30 @@ export default function DbConnectModal({ onClose, onSuccess }) {
   useEffect(() => {
     if (activeTab === 'saved') loadSaved();
   }, [activeTab]);
+
+  // Handle initial dataset for editing
+  useEffect(() => {
+    if (initialDataset && initialDataset.source_type === 'db') {
+      const loadInitial = async () => {
+        try {
+          const { getDbConnection, probeExistingDbConnection } = await import('../../lib/api');
+          const meta = typeof initialDataset.source_meta === 'string' ? JSON.parse(initialDataset.source_meta) : initialDataset.source_meta;
+          if (meta?.connection_id) {
+            const conn = await getDbConnection(meta.connection_id);
+            setActiveConnection(conn);
+            setStep('probing');
+            const result = await probeExistingDbConnection(conn.id);
+            setProbeResult(result);
+            setSelectedTables(new Set([meta.table_name]));
+            setStep('tables');
+          }
+        } catch (e) {
+          console.error("Failed to load initial DB dataset", e);
+        }
+      };
+      loadInitial();
+    }
+  }, [initialDataset]);
 
   const loadSaved = async () => {
     setLoadingSaved(true);

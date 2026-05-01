@@ -1,5 +1,6 @@
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from auth.dependencies import get_current_user
 from typing import List, Optional
 from pydantic import BaseModel
 from models.database import get_db
@@ -15,12 +16,12 @@ class VisualizationBase(BaseModel):
     config: dict  # Native object support
 
 @router.get("/")
-async def list_visualizations(dataset_id: Optional[str] = None):
+def list_visualizations(dataset_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         if dataset_id:
-            cursor = conn.execute("SELECT * FROM visualizations WHERE dataset_id = ?", (dataset_id,))
+            cursor = conn.execute("SELECT * FROM visualizations WHERE dataset_id = ? AND user_id = ?", (dataset_id, current_user["id"]))
         else:
-            cursor = conn.execute("SELECT * FROM visualizations ORDER BY created_at DESC")
+            cursor = conn.execute("SELECT * FROM visualizations WHERE user_id = ? ORDER BY created_at DESC", (current_user["id"],))
         
         rows = []
         for row in cursor.fetchall():
@@ -31,9 +32,9 @@ async def list_visualizations(dataset_id: Optional[str] = None):
         return {"visualizations": rows}
 
 @router.get("/{viz_id}")
-async def get_visualization(viz_id: str):
+def get_visualization(viz_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM visualizations WHERE id = ?", (viz_id,))
+        cursor = conn.execute("SELECT * FROM visualizations WHERE id = ? AND user_id = ?", (viz_id, current_user["id"]))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Visualization not found")
@@ -44,10 +45,10 @@ async def get_visualization(viz_id: str):
         return d
 
 @router.post("/")
-async def save_visualization(viz: VisualizationBase):
+def save_visualization(viz: VisualizationBase, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         # Check for existing visualization by name
-        cursor = conn.execute("SELECT id FROM visualizations WHERE name = ?", (viz.name,))
+        cursor = conn.execute("SELECT id FROM visualizations WHERE name = ? AND user_id = ?", (viz.name, current_user["id"]))
         existing = cursor.fetchone()
         
         if existing:
@@ -55,29 +56,29 @@ async def save_visualization(viz: VisualizationBase):
             conn.execute("""
                 UPDATE visualizations 
                 SET dataset_id = ?, query_id = ?, chart_type = ?, config = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (viz.dataset_id, viz.query_id, viz.chart_type, json.dumps(viz.config), viz_id))
+                WHERE id = ? AND user_id = ?
+            """, (viz.dataset_id, viz.query_id, viz.chart_type, json.dumps(viz.config), viz_id, current_user["id"]))
             return {"id": viz_id, **viz.dict()}
         else:
             viz_id = str(uuid.uuid4())
             conn.execute("""
-                INSERT INTO visualizations (id, name, dataset_id, query_id, chart_type, config)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (viz_id, viz.name, viz.dataset_id, viz.query_id, viz.chart_type, json.dumps(viz.config)))
+                INSERT INTO visualizations (id, user_id, name, dataset_id, query_id, chart_type, config)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (viz_id, current_user["id"], viz.name, viz.dataset_id, viz.query_id, viz.chart_type, json.dumps(viz.config)))
             return {"id": viz_id, **viz.dict()}
 
 @router.put("/{viz_id}")
-async def update_visualization(viz_id: str, viz: VisualizationBase):
+def update_visualization(viz_id: str, viz: VisualizationBase, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         conn.execute("""
             UPDATE visualizations 
             SET name = ?, chart_type = ?, config = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        """, (viz.name, viz.chart_type, json.dumps(viz.config), viz_id))
+            WHERE id = ? AND user_id = ?
+        """, (viz.name, viz.chart_type, json.dumps(viz.config), viz_id, current_user["id"]))
         return {"id": viz_id, **viz.dict()}
 
 @router.delete("/{viz_id}")
-async def delete_visualization(viz_id: str):
+def delete_visualization(viz_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        conn.execute("DELETE FROM visualizations WHERE id = ?", (viz_id,))
+        conn.execute("DELETE FROM visualizations WHERE id = ? AND user_id = ?", (viz_id, current_user["id"]))
         return {"status": "success"}

@@ -1,9 +1,13 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import ApiDataEnginePanel from "../components/api/ApiDataEnginePanel";
 import { PageContainer } from "../components/ui";
 import { PlugZap } from "lucide-react";
 
 export default function ApiIntegrationPage() {
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
+
   return (
     <PageContainer wide>
       <div className="flex flex-col gap-10 animate-fade-in w-full pb-20">
@@ -30,7 +34,7 @@ export default function ApiIntegrationPage() {
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald/5 rounded-full blur-[100px] pointer-events-none" />
           
-          <ApiDataEnginePanel />
+          <ApiDataEnginePanel initialDatasetId={editId} />
         </div>
       </div>
     </PageContainer>

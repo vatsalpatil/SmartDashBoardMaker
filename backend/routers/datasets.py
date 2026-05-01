@@ -1,4 +1,13 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from typing import List, Optional
+from pydantic import BaseModel
+from models.database import get_db
+from auth.dependencies import get_current_user
+import uuid
+import os
+import shutil
+import json
+import re
 from typing import List, Optional
 from pydantic import BaseModel
 from models.database import get_db
@@ -37,45 +46,57 @@ def prepare_dataset_response(d: dict):
     return d
 
 @router.get("/")
-async def list_datasets():
+def list_datasets(current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM datasets ORDER BY created_at DESC")
+        cursor = conn.execute("SELECT * FROM datasets WHERE user_id = ? ORDER BY created_at DESC", (current_user["id"],))
         datasets = []
         for row in cursor.fetchall():
             datasets.append(prepare_dataset_response(dict(row)))
         return {"datasets": datasets}
 
 @router.get("/{dataset_id}")
-async def get_dataset(dataset_id: str):
+def get_dataset(dataset_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM datasets WHERE id = ?", (dataset_id,))
+        cursor = conn.execute("SELECT * FROM datasets WHERE id = ? AND user_id = ?", (dataset_id, current_user["id"]))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Dataset not found")
         return prepare_dataset_response(dict(row))
 
 @router.post("/")
-async def create_dataset(dataset: DatasetBase):
+def create_dataset(dataset: DatasetBase, current_user: dict = Depends(get_current_user)):
     dataset_id = str(uuid.uuid4())
     with get_db() as conn:
         conn.execute("""
             INSERT INTO datasets (
-                id, name, original_filename, file_path, file_size, 
+                id, user_id, name, original_filename, file_path, file_size, 
                 row_count, columns, is_virtual, parent_dataset_id, 
                 sql_query, source_type, source_meta
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            dataset_id, dataset.name, dataset.original_filename, dataset.file_path,
+            dataset_id, current_user["id"], dataset.name, dataset.original_filename, dataset.file_path,
             dataset.file_size, dataset.row_count, dataset.columns, dataset.is_virtual,
             dataset.parent_dataset_id, dataset.sql_query, dataset.source_type, dataset.source_meta
         ))
         return {"id": dataset_id, **dataset.dict()}
 
 @router.delete("/{dataset_id}")
-async def delete_dataset(dataset_id: str):
+def delete_dataset(dataset_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        conn.execute("DELETE FROM datasets WHERE id = ?", (dataset_id,))
+        conn.execute("DELETE FROM datasets WHERE id = ? AND user_id = ?", (dataset_id, current_user["id"]))
         return {"status": "success"}
+
+class DatasetUpdate(BaseModel):
+    name: str
+
+@router.patch("/{dataset_id}")
+def update_dataset(dataset_id: str, payload: DatasetUpdate, current_user: dict = Depends(get_current_user)):
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE datasets SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+            (payload.name, dataset_id, current_user["id"])
+        )
+        return {"status": "success", "name": payload.name}
 
 from fastapi import UploadFile, File, Form
 import os
@@ -86,12 +107,13 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload")
-async def upload_dataset(
+def upload_dataset(
     file: UploadFile = File(...),
     name: str = Form(...),
     source_type: str = Form("file"),
     source_meta: str = Form("{}"),
-    id: Optional[str] = Form(None)
+    id: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user)
 ):
     dataset_id = id or str(uuid.uuid4())
     
@@ -131,16 +153,16 @@ async def upload_dataset(
                     name = ?, original_filename = ?, file_path = ?, 
                     file_size = ?, row_count = ?, columns = ?,
                     source_type = ?, source_meta = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (name, file.filename, file_path, file_size, row_count, json.dumps(cols_meta), source_type, source_meta, id))
+                WHERE id = ? AND user_id = ?
+            """, (name, file.filename, file_path, file_size, row_count, json.dumps(cols_meta), source_type, source_meta, id, current_user["id"]))
         else:
             # Insert new
             db.execute("""
                 INSERT INTO datasets (
-                    id, name, original_filename, file_path, file_size, 
+                    id, user_id, name, original_filename, file_path, file_size, 
                     row_count, columns, source_type, source_meta, is_virtual
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-            """, (dataset_id, name, file.filename, file_path, file_size, row_count, json.dumps(cols_meta), source_type, source_meta))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            """, (dataset_id, current_user["id"], name, file.filename, file_path, file_size, row_count, json.dumps(cols_meta), source_type, source_meta))
 
     return {
         "id": dataset_id,
@@ -151,8 +173,13 @@ async def upload_dataset(
     }
 
 @router.get("/{dataset_id}/preview")
-async def preview_dataset_endpoint(dataset_id: str, page: int = 1, page_size: int = 50):
+def preview_dataset_endpoint(dataset_id: str, page: int = 1, page_size: int = 50, current_user: dict = Depends(get_current_user)):
     from services.data_service import execute_query_duckdb, resolve_table_reference
+    
+    # Check ownership
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM datasets WHERE id = ? AND user_id = ?", (dataset_id, current_user["id"])).fetchone():
+            return {"columns": [], "rows": [], "total_rows": 0, "error": "Access denied"}
     try:
         table_name = resolve_table_reference(dataset_id)
         

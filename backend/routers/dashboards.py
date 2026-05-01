@@ -1,5 +1,6 @@
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from auth.dependencies import get_current_user
 from typing import List, Optional, Any
 from pydantic import BaseModel
 from models.database import get_db
@@ -24,9 +25,9 @@ class DashboardUpdate(BaseModel):
     global_filters: Optional[Any] = None
 
 @router.get("/")
-async def list_dashboards():
+def list_dashboards(current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM dashboards ORDER BY created_at DESC")
+        cursor = conn.execute("SELECT * FROM dashboards WHERE user_id = ? ORDER BY created_at DESC", (current_user["id"],))
         rows = []
         for row in cursor.fetchall():
             d = dict(row)
@@ -42,9 +43,9 @@ async def list_dashboards():
         return {"dashboards": rows}
 
 @router.get("/{dashboard_id}")
-async def get_dashboard(dashboard_id: str):
+def get_dashboard(dashboard_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ?", (dashboard_id,))
+        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ? AND user_id = ?", (dashboard_id, current_user["id"]))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -61,14 +62,15 @@ async def get_dashboard(dashboard_id: str):
         return d
 
 @router.post("/")
-async def save_dashboard(db: DashboardBase):
+def save_dashboard(db: DashboardBase, current_user: dict = Depends(get_current_user)):
     db_id = str(uuid.uuid4())
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO dashboards (id, name, description, layout, widgets, tabs, global_filters)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO dashboards (id, user_id, name, description, layout, widgets, tabs, global_filters)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            db_id, 
+            db_id,
+            current_user["id"],
             db.name, 
             db.description, 
             json.dumps(db.layout), 
@@ -76,7 +78,7 @@ async def save_dashboard(db: DashboardBase):
             json.dumps(db.tabs),
             json.dumps(db.global_filters)
         ))
-        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ?", (db_id,))
+        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ? AND user_id = ?", (db_id, current_user["id"]))
         row = cursor.fetchone()
         d = dict(row)
         d['layout'] = json.loads(d['layout'])
@@ -86,9 +88,9 @@ async def save_dashboard(db: DashboardBase):
         return d
 
 @router.put("/{dashboard_id}")
-async def update_dashboard(dashboard_id: str, db: DashboardUpdate):
+def update_dashboard(dashboard_id: str, db: DashboardUpdate, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ?", (dashboard_id,))
+        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ? AND user_id = ?", (dashboard_id, current_user["id"]))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -106,10 +108,10 @@ async def update_dashboard(dashboard_id: str, db: DashboardUpdate):
         conn.execute("""
             UPDATE dashboards 
             SET name = ?, description = ?, layout = ?, widgets = ?, tabs = ?, global_filters = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        """, (name, desc, layout_json, widgets_json, tabs_json, filters_json, dashboard_id))
+            WHERE id = ? AND user_id = ?
+        """, (name, desc, layout_json, widgets_json, tabs_json, filters_json, dashboard_id, current_user["id"]))
         
-        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ?", (dashboard_id,))
+        cursor = conn.execute("SELECT * FROM dashboards WHERE id = ? AND user_id = ?", (dashboard_id, current_user["id"]))
         row = cursor.fetchone()
         d = dict(row)
         d['layout'] = json.loads(d['layout'])
@@ -119,7 +121,7 @@ async def update_dashboard(dashboard_id: str, db: DashboardUpdate):
         return d
 
 @router.delete("/{dashboard_id}")
-async def delete_dashboard(dashboard_id: str):
+def delete_dashboard(dashboard_id: str, current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
-        conn.execute("DELETE FROM dashboards WHERE id = ?", (dashboard_id,))
+        conn.execute("DELETE FROM dashboards WHERE id = ? AND user_id = ?", (dashboard_id, current_user["id"]))
         return {"status": "success"}

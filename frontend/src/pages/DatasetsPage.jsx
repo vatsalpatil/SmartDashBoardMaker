@@ -13,7 +13,6 @@ import DatasetList from "../components/datasets/DatasetList";
 import { listDatasets } from "../lib/api";
 import { PageContainer } from "../components/ui";
 import DbConnectModal from "../components/datasets/DbConnectModal";
-import UrlImportModal from "../components/datasets/UrlImportModal";
 
 export default function DatasetsPage() {
   const [datasets, setDatasets] = useState([]);
@@ -21,7 +20,7 @@ export default function DatasetsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDbModal, setShowDbModal] = useState(false);
-  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [editingDataset, setEditingDataset] = useState(null);
 
   const navigate = useNavigate();
 
@@ -39,6 +38,18 @@ export default function DatasetsPage() {
   useEffect(() => {
     fetchDatasets();
   }, [refreshKey]);
+
+  const handleEdit = (ds) => {
+    if (ds.source_type === "db") {
+      setEditingDataset(ds);
+      setShowDbModal(true);
+    } else if (ds.source_type === "url") {
+      navigate(`/import/url?edit=${ds.id}`);
+    } else {
+      // For local files, we'll keep the rename functionality in DatasetList
+      return "rename";
+    }
+  };
 
   return (
     <div className="flex-1 bg-bg-base overflow-y-auto custom-scrollbar">
@@ -81,20 +92,10 @@ export default function DatasetsPage() {
           </div>
 
           {/* Action Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <button
-              onClick={() => navigate("/upload")}
-              className="group flex flex-col p-6 rounded-[24px] bg-bg-surface border border-border-muted hover:border-accent/40 transition-all shadow-sm hover:shadow-lg hover:shadow-black/20 hover:-translate-y-1 text-left"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-accent-muted flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
-                <Upload size={22} className="text-accent" />
-              </div>
-              <h3 className="text-[16px] font-bold text-text-primary mb-1">Upload File</h3>
-              <p className="text-[13px] text-text-tertiary leading-relaxed">Import CSV or Excel files from your local drive.</p>
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
 
             <button
-              onClick={() => setShowUrlModal(true)}
+              onClick={() => navigate("/import/url")}
               className="group flex flex-col p-6 rounded-[24px] bg-bg-surface border border-border-muted hover:border-emerald/40 transition-all shadow-sm hover:shadow-lg hover:shadow-black/20 hover:-translate-y-1 text-left"
             >
               <div className="w-12 h-12 rounded-2xl bg-emerald-muted flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
@@ -105,7 +106,7 @@ export default function DatasetsPage() {
             </button>
 
             <button
-              onClick={() => setShowDbModal(true)}
+              onClick={() => { setEditingDataset(null); setShowDbModal(true); }}
               className="group flex flex-col p-6 rounded-[24px] bg-bg-surface border border-border-muted hover:border-violet/40 transition-all shadow-sm hover:shadow-lg hover:shadow-black/20 hover:-translate-y-1 text-left"
             >
               <div className="w-12 h-12 rounded-2xl bg-violet-muted flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
@@ -140,6 +141,7 @@ export default function DatasetsPage() {
                 key={refreshKey}
                 searchQuery={searchQuery}
                 onRefresh={() => setRefreshKey((k) => k + 1)}
+                onEdit={handleEdit}
               />
             </div>
           </div>
@@ -149,18 +151,11 @@ export default function DatasetsPage() {
       {/* Modals */}
       {showDbModal && (
         <DbConnectModal
-          onClose={() => setShowDbModal(false)}
+          initialDataset={editingDataset}
+          onClose={() => { setShowDbModal(false); setEditingDataset(null); }}
           onSuccess={() => {
             setShowDbModal(false);
-            setRefreshKey((k) => k + 1);
-          }}
-        />
-      )}
-      {showUrlModal && (
-        <UrlImportModal
-          onClose={() => setShowUrlModal(false)}
-          onSuccess={() => {
-            setShowUrlModal(false);
+            setEditingDataset(null);
             setRefreshKey((k) => k + 1);
           }}
         />

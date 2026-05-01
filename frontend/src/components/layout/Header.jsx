@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate, NavLink } from "react-router-dom";
 import {
   ChevronRight,
-  Home,
   Database,
   Search,
   BarChart3,
@@ -11,55 +10,87 @@ import {
   Wand2,
   Layers,
   Palette,
+  LogOut,
+  User,
+  ChevronDown,
+  Shield,
 } from "lucide-react";
 import ThemePanel from "./ThemePanel";
+import { useAuth } from "../../lib/AuthContext";
 
 const navItems = [
-  { to: "/", icon: Database, label: "Data Sources", end: true },
-  { to: "/query", icon: Search, label: "SQL Editor" },
-  { to: "/custom", icon: Wand2, label: "Builder" },
-  { to: "/visualize", icon: BarChart3, label: "Visualize" },
-  { to: "/widgets", icon: Component, label: "Widgets" },
-  { to: "/dashboards", icon: LayoutDashboard, label: "Dashboards" },
+  { to: "/",          icon: Database,        label: "Data Sources", end: true },
+  { to: "/query",     icon: Search,          label: "SQL Editor"   },
+  { to: "/custom",    icon: Wand2,           label: "Builder"      },
+  { to: "/visualize", icon: BarChart3,       label: "Visualize"    },
+  { to: "/widgets",   icon: Component,       label: "Widgets"      },
+  { to: "/dashboards",icon: LayoutDashboard, label: "Dashboards"   },
 ];
 
 const routeMeta = {
-  "/": { title: "Datasets", crumbs: [] },
-  "/upload": {
-    title: "Upload Dataset",
-    crumbs: [{ label: "Datasets", to: "/" }],
-  },
-  "/query": { title: "SQL Editor", crumbs: [] },
-  "/custom": { title: "Visual SQL Builder", crumbs: [] },
-  "/api": { title: "API Integration", crumbs: [] },
-  "/visualize": { title: "Visualization Builder", crumbs: [] },
-  "/dashboards": { title: "Dashboards", crumbs: [] },
-  "/widgets": { title: "Widgets", crumbs: [] },
+  "/":           { title: "Datasets",              crumbs: [] },
+  "/upload":     { title: "Upload Dataset",         crumbs: [{ label: "Datasets", to: "/" }] },
+  "/query":      { title: "SQL Editor",             crumbs: [] },
+  "/custom":     { title: "Visual SQL Builder",     crumbs: [] },
+  "/api":        { title: "API Integration",        crumbs: [] },
+  "/visualize":  { title: "Visualization Builder",  crumbs: [] },
+  "/dashboards": { title: "Dashboards",             crumbs: [] },
+  "/widgets":    { title: "Widgets",                crumbs: [] },
 };
 
+/** Derive initials for the avatar */
+function initials(user) {
+  if (!user) return "?";
+  const name = user.full_name || user.username || "";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("") || user.username?.[0]?.toUpperCase() || "U";
+}
+
 export default function Header() {
-  const [themeOpen, setThemeOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [themeOpen, setThemeOpen]     = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef                    = useRef(null);
+  const location                      = useLocation();
+  const navigate                      = useNavigate();
+  const { user, logout }              = useAuth();
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    await logout();
+    navigate("/login");
+  };
 
   let meta = routeMeta[location.pathname];
   if (!meta) {
     if (location.pathname.startsWith("/dataset/")) {
-      meta = {
-        title: "Dataset Details",
-        crumbs: [{ label: "Datasets", to: "/" }],
-      };
+      meta = { title: "Dataset Details", crumbs: [{ label: "Datasets", to: "/" }] };
     } else {
-      meta = { title: "VeryDash", crumbs: [] };
+      meta = { title: "DASHTOR", crumbs: [] };
     }
   }
 
   return (
     <header className="h-14 bg-bg-surface border-b border-border-default flex items-center shrink-0 z-50 sticky top-0 shadow-sm">
       <div className="w-full flex items-center h-full px-6">
-        {/* Left Area: Branding */}
+
+        {/* Left: Branding */}
         <div className="flex-1 flex items-center justify-start min-w-0">
-          <div 
+          <div
             className="flex items-center gap-2.5 cursor-pointer shrink-0"
             onClick={() => navigate("/")}
           >
@@ -72,7 +103,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Center Area: Navigation */}
+        {/* Center: Navigation */}
         <nav className="flex items-center gap-5 flex-none h-full">
           {navItems.map(({ to, icon: Icon, label, end }) => (
             <NavLink
@@ -94,9 +125,10 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* Right Area: Actions */}
+        {/* Right: Actions */}
         <div className="flex-1 flex items-center justify-end gap-3 min-w-0">
-          {/* Status Indicator */}
+
+          {/* Online indicator */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-base border border-border-muted shrink-0">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald shadow-[0_0_8px_var(--color-emerald)] animate-pulse" />
             <span className="text-[10px] text-text-secondary font-black uppercase tracking-widest leading-none">
@@ -104,7 +136,7 @@ export default function Header() {
             </span>
           </div>
 
-          {/* Theme Button */}
+          {/* Theme */}
           <button
             onClick={() => setThemeOpen(true)}
             className="flex items-center justify-center w-9 h-9 rounded-lg text-text-tertiary hover:text-accent hover:bg-accent-muted transition-all duration-150 shrink-0"
@@ -113,9 +145,68 @@ export default function Header() {
             <Palette size={18} />
           </button>
 
-          {/* Profile */}
-          <div className="w-8 h-8 rounded-full bg-bg-raised border border-border-default flex items-center justify-center text-text-quaternary text-[11px] font-bold shadow-sm shrink-0">
-            VS
+          {/* User profile dropdown */}
+          <div className="relative shrink-0" ref={profileRef}>
+            <button
+              id="header-profile-btn"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="flex items-center gap-2 h-9 px-2 rounded-lg hover:bg-bg-muted transition-all duration-150 group"
+            >
+              {/* Avatar circle */}
+              <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-white text-[11px] font-bold shadow-glow-accent">
+                {initials(user)}
+              </div>
+              <span className="hidden md:block text-[12px] text-text-secondary group-hover:text-text-primary transition-colors max-w-[100px] truncate">
+                {user?.username || ""}
+              </span>
+              <ChevronDown size={13} className="text-text-quaternary" />
+            </button>
+
+            {/* Dropdown */}
+            {profileOpen && (
+              <div className="absolute right-0 top-11 w-56 bg-bg-surface border border-border-default rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in">
+                {/* User info header */}
+                <div className="px-4 py-3 border-b border-border-muted">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white text-[11px] font-bold shrink-0">
+                      {initials(user)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold text-text-primary truncate">
+                        {user?.full_name || user?.username}
+                      </div>
+                      <div className="text-[11px] text-text-tertiary truncate">{user?.email}</div>
+                    </div>
+                  </div>
+                  {user?.role === "admin" && (
+                    <div className="mt-2 flex items-center gap-1 text-[10px] text-amber-400 font-semibold uppercase tracking-wider">
+                      <Shield size={11} />
+                      Admin
+                    </div>
+                  )}
+                </div>
+
+                {/* Menu items */}
+                <div className="py-1">
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-text-secondary hover:bg-bg-muted hover:text-text-primary transition-colors"
+                    onClick={() => { setProfileOpen(false); }}
+                  >
+                    <User size={14} />
+                    Profile
+                  </button>
+                  <div className="border-t border-border-muted my-1" />
+                  <button
+                    id="header-logout-btn"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                    onClick={handleLogout}
+                  >
+                    <LogOut size={14} />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
